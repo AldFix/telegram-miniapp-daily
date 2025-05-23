@@ -28,6 +28,8 @@
       border: none;
       font-size: 16px;
       box-sizing: border-box;
+      background-color: #2a2a2a;
+      color: #f0f0f0;
     }
     button {
       background-color: #4CAF50;
@@ -46,14 +48,9 @@
     }
     .task-name {
       font-size: 16px;
-      margin-bottom: 5px;
+      margin-bottom: 10px;
       word-break: break-word;
       cursor: pointer;
-    }
-    .task-date {
-      font-size: 12px;
-      color: #999999;
-      margin-bottom: 8px;
     }
     .task-status {
       font-size: 14px;
@@ -62,10 +59,11 @@
       border-radius: 10px;
       display: inline-block;
       margin-top: 10px;
-      user-select: none;
+      background-color: #394040;
+      color: #dddddd;
     }
-    .status-В\ очереди { background-color: #2c2c2c; color: #bbbbbb; }
-    .status-В\ работе { background-color: #394040; color: #dddddd; }
+    .status-В\\ очереди { background-color: #2c2c2c; color: #bbbbbb; }
+    .status-В\\ работе { background-color: #394040; color: #dddddd; }
     .status-Выполнена { background-color: #335533; color: #c0ffc0; }
 
     .task-actions {
@@ -84,67 +82,11 @@
     .delete-btn {
       background-color: #d32f2f;
     }
-
-    /* Модальное окно */
-    .modal-overlay {
-      position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0,0,0,0.7);
-      display: none;
-      align-items: center;
-      justify-content: center;
-      z-index: 1000;
-    }
-    .modal {
-      background: #1f1f1f;
-      padding: 20px;
-      border-radius: 20px;
-      width: 320px;
-      box-shadow: 0 0 15px rgba(0,0,0,0.8);
-      box-sizing: border-box;
-    }
-    .modal h3 {
-      margin-top: 0;
-      color: #ccc;
-    }
-    .modal label {
-      display: block;
+    label {
       margin-top: 10px;
+      display: block;
       font-size: 14px;
-      color: #bbb;
-    }
-    .modal input[type="text"],
-    .modal select,
-    .modal input[type="date"] {
-      width: 100%;
-      padding: 8px;
-      margin-top: 5px;
-      border-radius: 8px;
-      border: none;
-      font-size: 16px;
-      box-sizing: border-box;
-    }
-    .modal-buttons {
-      margin-top: 20px;
-      display: flex;
-      justify-content: flex-end;
-      gap: 10px;
-    }
-    .modal-buttons button {
-      width: auto;
-      padding: 8px 16px;
-      font-size: 15px;
-      border-radius: 10px;
-      border: none;
-      cursor: pointer;
-    }
-    .btn-cancel {
-      background: #555;
-      color: #eee;
-    }
-    .btn-save {
-      background-color: #4CAF50;
-      color: white;
+      color: #aaa;
     }
   </style>
   <script type="module">
@@ -175,65 +117,28 @@
 
       if (!userId) return;
 
+      const input = document.getElementById("task-input");
+      const addBtn = document.getElementById("add-task");
       const list = document.getElementById("task-list");
       const statusFilter = document.getElementById("status-filter");
-      const openModalBtn = document.getElementById("add-task");
-      const modalOverlay = document.getElementById("modal-overlay");
-      const modalTitle = document.getElementById("modal-title");
-      const taskNameInput = document.getElementById("modal-task-name");
-      const taskStatusSelect = document.getElementById("modal-task-status");
-      const taskDateInput = document.getElementById("modal-task-date");
-      const btnSave = document.getElementById("modal-save");
-      const btnCancel = document.getElementById("modal-cancel");
+      const dateFrom = document.getElementById("date-from");
+      const dateTo = document.getElementById("date-to");
 
       let tasks = [];
-      let editingTaskId = null;
 
-      // Открытие модального окна для создания задачи
-      openModalBtn.onclick = () => {
-        editingTaskId = null;
-        modalTitle.textContent = "Создать задачу";
-        taskNameInput.value = "";
-        taskStatusSelect.value = "В очереди";
-        taskDateInput.value = ""; // пустая дата
-        modalOverlay.style.display = "flex";
-      };
+      addBtn.onclick = async () => {
+        const text = input.value.trim();
+        if (!text) return;
 
-      // Закрыть модалку
-      btnCancel.onclick = () => {
-        modalOverlay.style.display = "none";
-      };
+        const taskRef = push(ref(db, `users/${userId}/tasks`));
+        await set(taskRef, {
+          id: taskRef.key,
+          text,
+          status: "В очереди",
+          date: "" // пустая дата по умолчанию
+        });
 
-      // Сохранение новой или отредактированной задачи
-      btnSave.onclick = async () => {
-        const name = taskNameInput.value.trim();
-        const status = taskStatusSelect.value;
-        const date = taskDateInput.value; // строка формата YYYY-MM-DD
-
-        if (!name) {
-          alert("Введите название задачи!");
-          return;
-        }
-
-        if (editingTaskId) {
-          // Обновляем существующую задачу
-          await update(ref(db, `users/${userId}/tasks/${editingTaskId}`), {
-            text: name,
-            status: status,
-            date: date || null
-          });
-        } else {
-          // Создаём новую
-          const taskRef = push(ref(db, `users/${userId}/tasks`));
-          await set(taskRef, {
-            id: taskRef.key,
-            text: name,
-            status: status,
-            date: date || null
-          });
-        }
-
-        modalOverlay.style.display = "none";
+        input.value = "";
       };
 
       const tasksRef = ref(db, `users/${userId}/tasks`);
@@ -244,23 +149,34 @@
       });
 
       statusFilter.onchange = renderTasks;
+      dateFrom.onchange = renderTasks;
+      dateTo.onchange = renderTasks;
 
       function renderTasks() {
         list.innerHTML = "";
-        const selectedStatus = statusFilter.value;
 
-        // Сортируем по дате: если даты нет, ставим в конец
-        const sorted = tasks.slice().sort((a, b) => {
-          if (!a.date && !b.date) return 0;
-          if (!a.date) return 1;
-          if (!b.date) return -1;
-          return new Date(a.date) - new Date(b.date);
+        const selectedStatus = statusFilter.value;
+        const from = dateFrom.value;
+        const to = dateTo.value;
+
+        // Фильтруем задачи по статусу и дате
+        let filtered = tasks.filter(task => {
+          // Статус
+          if (selectedStatus && task.status !== selectedStatus) return false;
+
+          // Дата (если задана)
+          if (from && (!task.date || task.date < from)) return false;
+          if (to && (!task.date || task.date > to)) return false;
+
+          return true;
         });
 
-        // Фильтруем по статусу
-        const filtered = selectedStatus
-          ? sorted.filter(t => t.status === selectedStatus)
-          : sorted;
+        // Сортируем по дате (пустые даты в конце)
+        filtered.sort((a, b) => {
+          if (!a.date) return 1;
+          if (!b.date) return -1;
+          return a.date.localeCompare(b.date);
+        });
 
         filtered.forEach(task => {
           const li = document.createElement("li");
@@ -268,11 +184,12 @@
           const title = document.createElement("div");
           title.className = "task-name";
           title.textContent = task.text;
-          title.onclick = () => openEditModal(task);
-
-          const dateDiv = document.createElement("div");
-          dateDiv.className = "task-date";
-          dateDiv.textContent = task.date ? `Срок: ${task.date}` : "";
+          title.onclick = async () => {
+            const newText = prompt("Редактировать задачу:", task.text);
+            if (newText) {
+              await update(ref(db, `users/${userId}/tasks/${task.id}`), { text: newText });
+            }
+          };
 
           const status = document.createElement("select");
           ["В очереди", "В работе", "Выполнена"].forEach(s => {
@@ -282,89 +199,71 @@
             if (task.status === s) option.selected = true;
             status.appendChild(option);
           });
-          status.className = `task-status status-${task.status.replace(/\s/g, '\\ ')}`;
           status.onchange = async () => {
-            await update(ref(db, `users/${userId}/tasks/${task.id}`), {
-              status: status.value
-            });
+            await update(ref(db, `users/${userId}/tasks/${task.id}`), { status: status.value });
+            renderTasks();
+          };
+          status.className = `task-status status-${task.status.replace(" ", "\\ ")}`;
+
+          // Добавим дату выполнения рядом с задачей
+          const dateLabel = document.createElement("input");
+          dateLabel.type = "date";
+          dateLabel.value = task.date || "";
+          dateLabel.style.marginTop = "10px";
+          dateLabel.style.width = "auto";
+          dateLabel.onchange = async () => {
+            await update(ref(db, `users/${userId}/tasks/${task.id}`), { date: dateLabel.value });
+            renderTasks();
           };
 
           const actions = document.createElement("div");
           actions.className = "task-actions";
 
-          const btnDelete = document.createElement("button");
-          btnDelete.className = "delete-btn";
-          btnDelete.textContent = "Удалить";
-          btnDelete.onclick = () => {
+          const delBtn = document.createElement("button");
+          delBtn.textContent = "Удалить";
+          delBtn.className = "delete-btn";
+          delBtn.onclick = () => {
             if (confirm("Удалить задачу?")) {
               remove(ref(db, `users/${userId}/tasks/${task.id}`));
             }
           };
 
-          actions.appendChild(btnDelete);
+          actions.appendChild(status);
+          actions.appendChild(delBtn);
 
           li.appendChild(title);
-          li.appendChild(dateDiv);
-          li.appendChild(status);
           li.appendChild(actions);
+          li.appendChild(dateLabel);
 
           list.appendChild(li);
         });
       }
 
-      function openEditModal(task) {
-        editingTaskId = task.id;
-        modalTitle.textContent = "Редактировать задачу";
-        taskNameInput.value = task.text;
-        taskStatusSelect.value = task.status;
-        taskDateInput.value = task.date || "";
-        modalOverlay.style.display = "flex";
-      }
+      Telegram.WebApp.expand();
     };
   </script>
 </head>
 <body>
-  <div id="user-info" style="margin-bottom:20px; font-weight:700;"></div>
-
   <div class="card">
-    <button id="add-task">➕ Создать задачу</button>
-  </div>
+    <h1 id="user-info">Загрузка...</h1>
+    <input id="task-input" type="text" placeholder="Введите задачу" />
+    <button id="add-task">Добавить задачу</button>
 
-  <div class="card">
     <label for="status-filter">Фильтр по статусу:</label>
     <select id="status-filter">
-      <option value="">Все задачи</option>
+      <option value="">Все</option>
       <option value="В очереди">В очереди</option>
       <option value="В работе">В работе</option>
       <option value="Выполнена">Выполнена</option>
     </select>
-  </div>
 
-  <ul id="task-list"></ul>
+    <label for="date-from">Дата выполнения с:</label>
+    <input type="date" id="date-from" />
 
-  <!-- Модальное окно -->
-  <div id="modal-overlay" class="modal-overlay">
-    <div class="modal">
-      <h3 id="modal-title">Создать задачу</h3>
+    <label for="date-to">Дата выполнения по:</label>
+    <input type="date" id="date-to" />
 
-      <label for="modal-task-name">Название задачи</label>
-      <input type="text" id="modal-task-name" autocomplete="off" />
-
-      <label for="modal-task-status">Статус</label>
-      <select id="modal-task-status">
-        <option>В очереди</option>
-        <option>В работе</option>
-        <option>Выполнена</option>
-      </select>
-
-      <label for="modal-task-date">Дата выполнения</label>
-      <input type="date" id="modal-task-date" />
-
-      <div class="modal-buttons">
-        <button id="modal-cancel" class="btn-cancel">Отмена</button>
-        <button id="modal-save" class="btn-save">Сохранить</button>
-      </div>
-    </div>
+    <ul id="task-list"></ul>
   </div>
 </body>
 </html>
