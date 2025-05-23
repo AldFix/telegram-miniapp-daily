@@ -2,193 +2,268 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Список задач</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <title>Ежедневник++</title>
   <style>
     body {
-      background-color: #121212;
-      color: #e0e0e0;
-      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
       margin: 0;
+      font-family: sans-serif;
+      background-color: #121212;
+      color: #f0f0f0;
       padding: 20px;
+    }
+    .card {
+      background: #1f1f1f;
+      padding: 20px;
+      border-radius: 20px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+      margin-bottom: 20px;
+    }
+    input, select, button {
+      padding: 10px;
+      margin-top: 10px;
+      width: 100%;
+      border-radius: 10px;
+      border: none;
+      font-size: 16px;
       box-sizing: border-box;
+      background-color: #2a2a2a;
+      color: #f0f0f0;
     }
-
-    h1 {
-      text-align: center;
-      color: #ffffff;
-      margin-bottom: 30px;
+    button {
+      background-color: #4CAF50;
+      color: white;
+      cursor: pointer;
     }
-
-    #taskList {
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-      max-width: 800px;
-      margin: 0 auto;
+    ul {
+      padding-left: 0;
+      list-style-type: none;
     }
-
-    .task {
-      background-color: #1e1e1e;
-      border-radius: 12px;
-      padding: 20px;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.6);
-      transition: transform 0.2s ease;
+    li {
+      margin-bottom: 15px;
+      background: #2a2a2a;
+      padding: 15px;
+      border-radius: 15px;
     }
-
-    .task:hover {
-      transform: scale(1.01);
+    .task-name {
+      font-size: 16px;
+      margin-bottom: 10px;
+      word-break: break-word;
+      cursor: pointer;
     }
-
-    .task-title {
-      font-size: 1.2rem;
-      font-weight: 600;
-      color: #ffffff;
-      word-wrap: break-word;
-    }
-
     .task-status {
+      font-size: 14px;
+      font-weight: bold;
+      padding: 5px 10px;
+      border-radius: 10px;
       display: inline-block;
-      padding: 6px 12px;
-      border-radius: 8px;
-      font-size: 0.95rem;
-      font-weight: 500;
-      width: fit-content;
-      max-width: 100%;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .status-В_очереди {
-      background-color: #2c2c2c;
-      color: #bbbbbb;
-    }
-
-    .status-В_работе {
+      margin-top: 10px;
       background-color: #394040;
       color: #dddddd;
     }
+    .status-В\\ очереди { background-color: #2c2c2c; color: #bbbbbb; }
+    .status-В\\ работе { background-color: #394040; color: #dddddd; }
+    .status-Выполнена { background-color: #335533; color: #c0ffc0; }
 
-    .status-Выполнена {
-      background-color: #335533;
-      color: #c0ffc0;
+    .task-actions {
+      margin-top: 10px;
     }
-
-    .status-Отложено {
-      background-color: #444422;
-      color: #ffffaa;
+    .edit-btn, .delete-btn {
+      background-color: #333;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-size: 14px;
+      margin-right: 10px;
+      cursor: pointer;
     }
-
-    .status-Архив {
-      background-color: #222222;
-      color: #aaaaaa;
+    .delete-btn {
+      background-color: #d32f2f;
     }
-
-    .status-Ошибка {
-      background-color: #660000;
-      color: #ffcccc;
-    }
-
-    .task-date {
-      font-size: 0.9rem;
-      color: #999999;
-    }
-
-    @media (max-width: 600px) {
-      .task {
-        padding: 15px;
-      }
-
-      .task-title {
-        font-size: 1rem;
-      }
-
-      .task-status {
-        font-size: 0.85rem;
-      }
+    label {
+      margin-top: 10px;
+      display: block;
+      font-size: 14px;
+      color: #aaa;
     }
   </style>
-</head>
-<body>
-  <h1>Список задач</h1>
-  <div id="taskList"></div>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-app.js";
+    import {
+      getDatabase, ref, set, push, onValue, update, remove
+    } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-database.js";
 
-  <script>
-    const tasks = [
-      {
-        title: "Записать стрим по автоматизации",
-        status: "В очереди",
-        dueDate: "2025-05-25"
-      },
-      {
-        title: "Фикс багов в Telegram Mini App",
-        status: "В работе",
-        dueDate: "2025-05-24"
-      },
-      {
-        title: "Обновить документацию по проекту",
-        status: "Выполнена",
-        dueDate: "2025-05-22"
-      },
-      {
-        title: "Позвать дизайнера на ревью UI",
-        status: "Отложено",
-        dueDate: "2025-06-01"
-      },
-      {
-        title: "Удалить старые проекты",
-        status: "Архив",
-        dueDate: "2025-05-15"
-      },
-      {
-        title: "Ошибка сохранения тегов",
-        status: "Ошибка",
-        dueDate: "2025-05-23"
-      }
-    ];
-
-    const statusEmojiMap = {
-      "В очереди": "🕓",
-      "В работе": "⚙️",
-      "Выполнена": "✅",
-      "Отложено": "🕳️",
-      "Архив": "📦",
-      "Ошибка": "❌"
+    const firebaseConfig = {
+      apiKey: "AIzaSyA_E4t3RHWLNtorKm9utOyyRwojkUsUmis",
+      authDomain: "telegramminiappdaily.firebaseapp.com",
+      databaseURL: "https://telegramminiappdaily-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "telegramminiappdaily",
+      storageBucket: "telegramminiappdaily.appspot.com",
+      messagingSenderId: "324821981446",
+      appId: "1:324821981446:web:bad97b2c34a73087e2e687"
     };
 
-    function renderTasks() {
-      const taskList = document.getElementById("taskList");
-      taskList.innerHTML = "";
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
 
-      tasks.forEach(task => {
-        const taskCard = document.createElement("div");
-        taskCard.className = "task";
+    window.onload = () => {
+      const tgUser = window.Telegram.WebApp.initDataUnsafe?.user;
+      const userId = tgUser?.id;
 
-        const title = document.createElement("div");
-        title.className = "task-title";
-        title.textContent = task.title;
+      document.getElementById("user-info").textContent =
+        tgUser ? `Привет, ${tgUser.first_name} 👋` : "Не авторизован через Telegram";
 
-        const statusBadge = document.createElement("div");
-        statusBadge.className = `task-status status-${task.status.replace(/ /g, "_")}`;
-        statusBadge.textContent = `${statusEmojiMap[task.status] || ""} ${task.status}`;
+      if (!userId) return;
 
-        const dueDate = document.createElement("div");
-        dueDate.className = "task-date";
-        dueDate.textContent = `Выполнить до: ${task.dueDate}`;
+      const input = document.getElementById("task-input");
+      const addBtn = document.getElementById("add-task");
+      const list = document.getElementById("task-list");
+      const statusFilter = document.getElementById("status-filter");
+      const dateFrom = document.getElementById("date-from");
+      const dateTo = document.getElementById("date-to");
 
-        taskCard.appendChild(title);
-        taskCard.appendChild(statusBadge);
-        taskCard.appendChild(dueDate);
+      let tasks = [];
 
-        taskList.appendChild(taskCard);
+      addBtn.onclick = async () => {
+        const text = input.value.trim();
+        if (!text) return;
+
+        const taskRef = push(ref(db, `users/${userId}/tasks`));
+        await set(taskRef, {
+          id: taskRef.key,
+          text,
+          status: "В очереди",
+          date: "" // пустая дата по умолчанию
+        });
+
+        input.value = "";
+      };
+
+      const tasksRef = ref(db, `users/${userId}/tasks`);
+      onValue(tasksRef, (snapshot) => {
+        const data = snapshot.val();
+        tasks = data ? Object.values(data) : [];
+        renderTasks();
       });
-    }
 
-    renderTasks();
+      statusFilter.onchange = renderTasks;
+      dateFrom.onchange = renderTasks;
+      dateTo.onchange = renderTasks;
+
+      function renderTasks() {
+        list.innerHTML = "";
+
+        const selectedStatus = statusFilter.value;
+        const from = dateFrom.value;
+        const to = dateTo.value;
+
+        // Фильтруем задачи по статусу и дате
+        let filtered = tasks.filter(task => {
+          // Статус
+          if (selectedStatus && task.status !== selectedStatus) return false;
+
+          // Дата (если задана)
+          if (from && (!task.date || task.date < from)) return false;
+          if (to && (!task.date || task.date > to)) return false;
+
+          return true;
+        });
+
+        // Сортируем по дате (пустые даты в конце)
+        filtered.sort((a, b) => {
+          if (!a.date) return 1;
+          if (!b.date) return -1;
+          return a.date.localeCompare(b.date);
+        });
+
+        filtered.forEach(task => {
+          const li = document.createElement("li");
+
+          const title = document.createElement("div");
+          title.className = "task-name";
+          title.textContent = task.text;
+          title.onclick = async () => {
+            const newText = prompt("Редактировать задачу:", task.text);
+            if (newText) {
+              await update(ref(db, `users/${userId}/tasks/${task.id}`), { text: newText });
+            }
+          };
+
+          const status = document.createElement("select");
+          ["В очереди", "В работе", "Выполнена"].forEach(s => {
+            const option = document.createElement("option");
+            option.value = s;
+            option.textContent = s;
+            if (task.status === s) option.selected = true;
+            status.appendChild(option);
+          });
+          status.onchange = async () => {
+            await update(ref(db, `users/${userId}/tasks/${task.id}`), { status: status.value });
+            renderTasks();
+          };
+          status.className = `task-status status-${task.status.replace(" ", "\\ ")}`;
+
+          // Добавим дату выполнения рядом с задачей
+          const dateLabel = document.createElement("input");
+          dateLabel.type = "date";
+          dateLabel.value = task.date || "";
+          dateLabel.style.marginTop = "10px";
+          dateLabel.style.width = "auto";
+          dateLabel.onchange = async () => {
+            await update(ref(db, `users/${userId}/tasks/${task.id}`), { date: dateLabel.value });
+            renderTasks();
+          };
+
+          const actions = document.createElement("div");
+          actions.className = "task-actions";
+
+          const delBtn = document.createElement("button");
+          delBtn.textContent = "Удалить";
+          delBtn.className = "delete-btn";
+          delBtn.onclick = () => {
+            if (confirm("Удалить задачу?")) {
+              remove(ref(db, `users/${userId}/tasks/${task.id}`));
+            }
+          };
+
+          actions.appendChild(status);
+          actions.appendChild(delBtn);
+
+          li.appendChild(title);
+          li.appendChild(actions);
+          li.appendChild(dateLabel);
+
+          list.appendChild(li);
+        });
+      }
+
+      Telegram.WebApp.expand();
+    };
   </script>
+</head>
+<body>
+  <div class="card">
+    <h1 id="user-info">Загрузка...</h1>
+    <input id="task-input" type="text" placeholder="Введите задачу" />
+    <button id="add-task">Добавить задачу</button>
+
+    <label for="status-filter">Фильтр по статусу:</label>
+    <select id="status-filter">
+      <option value="">Все</option>
+      <option value="В очереди">В очереди</option>
+      <option value="В работе">В работе</option>
+      <option value="Выполнена">Выполнена</option>
+    </select>
+
+    <label for="date-from">Дата выполнения с:</label>
+    <input type="date" id="date-from" />
+
+    <label for="date-to">Дата выполнения по:</label>
+    <input type="date" id="date-to" />
+
+    <ul id="task-list"></ul>
+  </div>
 </body>
 </html>
