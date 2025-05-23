@@ -1,357 +1,402 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Таск-лист с визуалом и редактированием</title>
-<style>
-  body {
-    margin: 0; 
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background-color: #121212;
-    color: #f0f0f0;
-    padding: 20px;
-    user-select: none;
-  }
-  .card {
-    background: #1f1f1f;
-    padding: 20px;
-    border-radius: 20px;
-    box-shadow: 0 0 15px rgba(0, 255, 140, 0.4);
-    margin-bottom: 20px;
-    transition: box-shadow 0.3s ease;
-  }
-  .card:hover {
-    box-shadow: 0 0 25px rgba(0, 255, 140, 0.7);
-  }
-  input, button, select {
-    padding: 12px 15px;
-    margin-top: 10px;
-    width: 100%;
-    border-radius: 12px;
-    border: none;
-    font-size: 17px;
-    outline-offset: 2px;
-    transition: background-color 0.3s ease, box-shadow 0.2s ease;
-    background-color: #2a2a2a;
-    color: #eee;
-  }
-  input::placeholder {
-    color: #777;
-  }
-  input:focus, select:focus {
-    background-color: #333;
-    box-shadow: 0 0 10px #00ff92;
-  }
-  button {
-    background-color: #00ff92;
-    color: #121212;
-    cursor: pointer;
-    font-weight: 700;
-    box-shadow: 0 4px 8px rgba(0, 255, 146, 0.5);
-  }
-  button:hover {
-    background-color: #00d978;
-    box-shadow: 0 6px 15px rgba(0, 255, 146, 0.9);
-  }
-  ul {
-    padding-left: 0;
-    list-style: none;
-  }
-  li {
-    margin-bottom: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    border-radius: 14px;
-    padding: 12px 16px;
-    background: #222;
-    transition: background-color 0.25s ease;
-  }
-  li:hover {
-    background: #005f3e;
-  }
-  .task-link {
-    color: #ccc;
-    text-decoration: none;
-    font-size: 18px;
-    flex-grow: 1;
-    cursor: pointer;
-    user-select: none;
-  }
-  .task-link:hover {
-    text-decoration: underline;
-    color: #00ff92;
-  }
-  .task-link.completed {
-    color: #55ff88;
-    text-decoration: line-through;
-  }
-  select.status-select {
-    background-color: #444;
-    color: #eee;
-    border-radius: 10px;
-    padding: 6px 10px;
-    font-weight: 600;
-    width: 150px;
-    cursor: pointer;
-    border: none;
-  }
-  .delete-btn {
-    background-color: #d32f2f;
-    color: white;
-    border: none;
-    border-radius: 12px;
-    padding: 6px 14px;
-    font-size: 16px;
-    cursor: pointer;
-    opacity: 0.8;
-    transition: opacity 0.3s ease;
-    margin-left: 15px;
-  }
-  .delete-btn:hover {
-    opacity: 1;
-    box-shadow: 0 0 10px #d32f2f;
-  }
-  .input-clear {
-    position: absolute;
-    right: 28px;
-    top: 14px;
-    cursor: pointer;
-    font-size: 18px;
-    color: #aaa;
-    user-select: none;
-  }
-  .input-clear:hover {
-    color: #00ff92;
-  }
-  /* Детальный просмотр */
-  .detail-view {
-    background: #222;
-    border-radius: 20px;
-    padding: 20px;
-    max-width: 600px;
-    margin: 0 auto;
-  }
-  .detail-view h2 {
-    margin-top: 0;
-  }
-  .detail-input {
-    width: 100%;
-    padding: 10px;
-    font-size: 18px;
-    border-radius: 12px;
-    border: none;
-    background-color: #2a2a2a;
-    color: #eee;
-    margin-bottom: 15px;
-  }
-  .buttons-row {
-    display: flex;
-    justify-content: flex-end;
-    gap: 10px;
-  }
-  /* Статусы для подсветки */
-  .status-в\ очереди {
-    background-color: #666;
-    color: #ccc;
-  }
-  .status-в\ работе {
-    background-color: #1a73e8;
-    color: #fff;
-  }
-  .status-выполнена {
-    background-color: #00c853;
-    color: #fff;
-  }
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <title>Ежедневник++</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background-color: #121212;
+      color: #eee;
+      padding: 20px;
+      box-sizing: border-box;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .card {
+      background: #1f1f1f;
+      padding: 20px;
+      border-radius: 20px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.5);
+      margin-bottom: 20px;
+      max-width: 600px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    #task-input {
+      padding: 10px;
+      border-radius: 10px;
+      border: none;
+      width: 100%;
+      font-size: 16px;
+      box-sizing: border-box;
+      background: #2a2a2a;
+      color: #eee;
+      outline: none;
+    }
+    #add-task {
+      margin-top: 10px;
+      padding: 10px;
+      width: 100%;
+      border-radius: 10px;
+      border: none;
+      background-color: #4caf50;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+    #add-task:hover {
+      background-color: #45a049;
+    }
+    ul {
+      list-style: none;
+      padding-left: 0;
+      margin: 0;
+    }
+    .task-item {
+      background: #2c2c2c;
+      border-radius: 12px;
+      margin-bottom: 12px;
+      padding: 10px 15px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-sizing: border-box;
+      box-shadow: 0 0 5px rgba(0,0,0,0.5);
+      user-select: none;
+    }
+    .task-title-link {
+      flex-grow: 1;
+      color: #6ab04c;
+      text-decoration: none;
+      font-weight: 600;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      cursor: pointer;
+      margin-right: 15px;
+    }
+    .task-title-link:hover {
+      text-decoration: underline;
+    }
+    .task-status-dropdown {
+      width: 140px;
+      padding: 6px 10px;
+      font-size: 14px;
+      background: #333;
+      border: 1px solid #555;
+      border-radius: 6px;
+      color: #eee;
+      cursor: pointer;
+      margin-right: 15px;
+      flex-shrink: 0;
+    }
+    .checkbox {
+      margin-right: 10px;
+      flex-shrink: 0;
+      cursor: pointer;
+    }
+    .delete-btn {
+      background-color: #d32f2f;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      padding: 6px 12px;
+      font-size: 14px;
+      cursor: pointer;
+      flex-shrink: 0;
+      user-select: none;
+      transition: background-color 0.3s ease;
+    }
+    .delete-btn:hover {
+      background-color: #b82828;
+    }
+    /* Модальное окно редактирования */
+    #modal {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.7);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+      padding: 15px;
+      box-sizing: border-box;
+    }
+    #modal.active {
+      display: flex;
+    }
+    #modal .modal-content {
+      background: #1e1e1e;
+      border-radius: 16px;
+      padding: 20px;
+      max-width: 500px;
+      width: 100%;
+      box-sizing: border-box;
+      box-shadow: 0 0 15px rgba(0,0,0,0.9);
+      display: flex;
+      flex-direction: column;
+    }
+    #modal textarea {
+      width: 100%;
+      min-height: 100px;
+      background: #2c2c2c;
+      border-radius: 10px;
+      border: 1px solid #555;
+      color: #eee;
+      padding: 10px;
+      font-size: 16px;
+      resize: vertical;
+      box-sizing: border-box;
+      margin-bottom: 15px;
+      outline: none;
+    }
+    #modal select {
+      padding: 6px 10px;
+      font-size: 14px;
+      background: #333;
+      border: 1px solid #555;
+      border-radius: 6px;
+      color: #eee;
+      margin-bottom: 15px;
+      cursor: pointer;
+    }
+    #modal .buttons {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+    #modal button {
+      padding: 8px 16px;
+      font-size: 14px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+      user-select: none;
+    }
+    #modal .save-btn {
+      background-color: #6ab04c;
+      color: white;
+    }
+    #modal .save-btn:hover {
+      background-color: #58a339;
+    }
+    #modal .delete-btn {
+      background-color: #eb4d4b;
+      color: white;
+    }
+    #modal .delete-btn:hover {
+      background-color: #c43d3a;
+    }
+    #modal .close-btn {
+      background-color: #555;
+      color: white;
+    }
+    #modal .close-btn:hover {
+      background-color: #444;
+    }
+
+    /* Адаптив */
+    @media (max-width: 650px) {
+      .card {
+        max-width: 100%;
+        margin: 10px;
+      }
+      .task-status-dropdown {
+        width: 110px;
+      }
+      #modal .modal-content {
+        max-width: 100%;
+      }
+    }
+  </style>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-app.js";
+    import { getDatabase, ref, set, push, onValue, update, remove } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyA_E4t3RHWLNtorKm9utOyyRwojkUsUmis",
+      authDomain: "telegramminiappdaily.firebaseapp.com",
+      databaseURL: "https://telegramminiappdaily-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "telegramminiappdaily",
+      storageBucket: "telegramminiappdaily.appspot.com",
+      messagingSenderId: "324821981446",
+      appId: "1:324821981446:web:bad97b2c34a73087e2e687"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    window.onload = () => {
+      const tgUser = window.Telegram.WebApp.initDataUnsafe?.user;
+      const userId = tgUser?.id;
+
+      const userInfoEl = document.getElementById("user-info");
+      const input = document.getElementById("task-input");
+      const btn = document.getElementById("add-task");
+      const list = document.getElementById("task-list");
+
+      const modal = document.getElementById("modal");
+      const modalTextarea = document.getElementById("modal-textarea");
+      const modalStatus = document.getElementById("modal-status");
+      const modalSaveBtn = document.getElementById("modal-save-btn");
+      const modalDeleteBtn = document.getElementById("modal-delete-btn");
+      const modalCloseBtn = document.getElementById("modal-close-btn");
+
+      let editingTaskId = null;
+
+      if (!userId) {
+        userInfoEl.textContent = "Не авторизован через Telegram";
+        return;
+      } else {
+        userInfoEl.textContent = `Привет, ${tgUser.first_name} 👋`;
+      }
+
+      btn.onclick = async () => {
+        const text = input.value.trim();
+        if (!text) return;
+
+        const taskRef = push(ref(db, `users/${userId}/tasks`));
+        await set(taskRef, {
+          id: taskRef.key,
+          text,
+          status: "В очереди",
+          createdAt: Date.now()
+        });
+        input.value = "";
+      };
+
+      // Обновление списка задач
+      onValue(ref(db, `users/${userId}/tasks`), (snapshot) => {
+        const tasks = snapshot.val() || {};
+        list.innerHTML = "";
+
+        for (const id in tasks) {
+          const task = tasks[id];
+
+          const li = document.createElement("li");
+          li.className = "task-item";
+
+          // Текст задачи как ссылка
+          const link = document.createElement("a");
+          link.className = "task-title-link";
+          link.textContent = task.text;
+          link.href = "#";
+          link.title = "Редактировать задачу";
+          link.onclick = (e) => {
+            e.preventDefault();
+            openModal(task);
+          };
+
+          // Статус - выпадающий список
+          const select = document.createElement("select");
+          select.className = "task-status-dropdown";
+          ["В очереди", "В работе", "Выполнена"].forEach(statusOption => {
+            const option = document.createElement("option");
+            option.value = statusOption;
+            option.textContent = statusOption;
+            if (task.status === statusOption) option.selected = true;
+            select.appendChild(option);
+          });
+          select.onchange = () => {
+            update(ref(db, `users/${userId}/tasks/${id}`), { status: select.value });
+          };
+
+          // Кнопка удаления
+          const deleteBtn = document.createElement("button");
+          deleteBtn.className = "delete-btn";
+          deleteBtn.textContent = "Удалить";
+          deleteBtn.onclick = async () => {
+            if (confirm("Удалить эту задачу?")) {
+              await remove(ref(db, `users/${userId}/tasks/${id}`));
+              if (editingTaskId === id) closeModal();
+            }
+          };
+
+          li.appendChild(link);
+          li.appendChild(select);
+          li.appendChild(deleteBtn);
+
+          list.appendChild(li);
+        }
+      });
+
+      // Модальное окно редактирования
+      function openModal(task) {
+        editingTaskId = task.id;
+        modalTextarea.value = task.text;
+        modalStatus.value = task.status;
+        modal.classList.add("active");
+      }
+
+      function closeModal() {
+        editingTaskId = null;
+        modal.classList.remove("active");
+      }
+
+      modalSaveBtn.onclick = async () => {
+        const newText = modalTextarea.value.trim();
+        const newStatus = modalStatus.value;
+
+        if (!newText) {
+          alert("Текст задачи не может быть пустым");
+          return;
+        }
+
+        await update(ref(db, `users/${userId}/tasks/${editingTaskId}`), {
+          text: newText,
+          status: newStatus,
+        });
+        closeModal();
+      };
+
+      modalDeleteBtn.onclick = async () => {
+        if (confirm("Удалить эту задачу?")) {
+          await remove(ref(db, `users/${userId}/tasks/${editingTaskId}`));
+          closeModal();
+        }
+      };
+
+      modalCloseBtn.onclick = () => {
+        closeModal();
+      };
+    };
+  </script>
 </head>
 <body>
+  <div class="card" id="user-info">Загрузка пользователя...</div>
 
-<div class="card">
-  <h1>Мои задачи</h1>
-  <div style="position: relative;">
-    <input id="task-input" type="text" placeholder="Введите задачу" />
-    <span id="clear-input" class="input-clear" title="Очистить поле">×</span>
+  <div class="card">
+    <input id="task-input" placeholder="Новая задача..." autocomplete="off" />
+    <button id="add-task">Добавить задачу</button>
   </div>
-  <select id="status-filter" style="margin-top: 12px; width: 100%; border-radius: 12px; padding: 12px 15px; font-size: 17px; background:#2a2a2a; color:#eee; border:none;">
-    <option value="all">Все статусы</option>
-    <option value="в очереди">В очереди</option>
-    <option value="в работе">В работе</option>
-    <option value="выполнена">Выполнена</option>
-  </select>
-  <button id="add-task-btn">Добавить задачу</button>
-  <ul id="task-list"></ul>
-</div>
 
-<!-- Детальный просмотр задачи -->
-<div id="detail-view" class="detail-view" style="display:none;">
-  <h2>Редактирование задачи</h2>
-  <input id="detail-task-text" class="detail-input" type="text" />
-  <select id="detail-task-status" class="status-select" style="margin-bottom: 15px;">
-    <option value="в очереди">В очереди</option>
-    <option value="в работе">В работе</option>
-    <option value="выполнена">Выполнена</option>
-  </select>
-  <div class="buttons-row">
-    <button id="save-task-btn">Сохранить</button>
-    <button id="delete-task-btn" style="background-color:#b71c1c;">Удалить</button>
-    <button id="cancel-edit-btn" style="background-color:#555;">Отмена</button>
+  <div class="card" style="flex-grow:1; max-height: 60vh; overflow-y: auto;">
+    <ul id="task-list"></ul>
   </div>
-</div>
 
-<script>
-  // --- Модель задачи ---
-  let tasks = JSON.parse(localStorage.getItem('tasks') || '[]');
-  let editingTaskId = null;
-
-  const taskInput = document.getElementById('task-input');
-  const addTaskBtn = document.getElementById('add-task-btn');
-  const taskList = document.getElementById('task-list');
-  const clearInputBtn = document.getElementById('clear-input');
-  const statusFilter = document.getElementById('status-filter');
-
-  const detailView = document.getElementById('detail-view');
-  const detailTaskText = document.getElementById('detail-task-text');
-  const detailTaskStatus = document.getElementById('detail-task-status');
-  const saveTaskBtn = document.getElementById('save-task-btn');
-  const deleteTaskBtn = document.getElementById('delete-task-btn');
-  const cancelEditBtn = document.getElementById('cancel-edit-btn');
-
-  // Функция сохранить задачи в localStorage
-  function saveTasks() {
-    localStorage.setItem('tasks', JSON.stringify(tasks));
-  }
-
-  // Генератор id
-  function generateId() {
-    return Date.now() + Math.random().toString(16).slice(2);
-  }
-
-  // Отрисовка списка с учетом фильтрации по статусу
-  function renderTasks() {
-    taskList.innerHTML = '';
-    const filter = statusFilter.value;
-    const filteredTasks = filter === 'all' ? tasks : tasks.filter(t => t.status === filter);
-
-    if(filteredTasks.length === 0){
-      taskList.innerHTML = `<li style="color:#777; font-style: italic;">Нет задач</li>`;
-      return;
-    }
-
-    filteredTasks.forEach(task => {
-      const li = document.createElement('li');
-
-      // Текст задачи - ссылка
-      const taskLink = document.createElement('a');
-      taskLink.textContent = task.text;
-      taskLink.href = '#';
-      taskLink.className = 'task-link';
-      if (task.status === 'выполнена') taskLink.classList.add('completed');
-      taskLink.onclick = (e) => {
-        e.preventDefault();
-        openDetailView(task.id);
-      };
-      li.appendChild(taskLink);
-
-      // Выпадающий список статусов
-      const statusSelect = document.createElement('select');
-      statusSelect.className = 'status-select';
-      ['в очереди', 'в работе', 'выполнена'].forEach(statusOption => {
-        const option = document.createElement('option');
-        option.value = statusOption;
-        option.textContent = statusOption;
-        if (task.status === statusOption) option.selected = true;
-        statusSelect.appendChild(option);
-      });
-      statusSelect.onchange = () => {
-        task.status = statusSelect.value;
-        saveTasks();
-        renderTasks();
-      };
-      li.appendChild(statusSelect);
-
-      taskList.appendChild(li);
-    });
-  }
-
-  // Добавление новой задачи
-  addTaskBtn.onclick = () => {
-    const text = taskInput.value.trim();
-    if (!text) return alert('Введите текст задачи!');
-    const newTask = {
-      id: generateId(),
-      text,
-      status: 'в очереди',
-    };
-    tasks.push(newTask);
-    saveTasks();
-    renderTasks();
-    taskInput.value = '';
-  };
-
-  // Очистка поля ввода
-  clearInputBtn.onclick = () => {
-    taskInput.value = '';
-    taskInput.focus();
-  };
-
-  // Фильтрация по статусу
-  statusFilter.onchange = () => {
-    renderTasks();
-  };
-
-  // Открыть детальный просмотр задачи для редактирования
-  function openDetailView(id) {
-    const task = tasks.find(t => t.id === id);
-    if (!task) return;
-    editingTaskId = id;
-    detailTaskText.value = task.text;
-    detailTaskStatus.value = task.status;
-    detailView.style.display = 'block';
-    document.querySelector('.card').style.display = 'none';
-  }
-
-  // Закрыть детальный просмотр
-  function closeDetailView() {
-    editingTaskId = null;
-    detailView.style.display = 'none';
-    document.querySelector('.card').style.display = 'block';
-  }
-
-  // Сохранить изменения в деталях
-  saveTaskBtn.onclick = () => {
-    const task = tasks.find(t => t.id === editingTaskId);
-    if (!task) return;
-    const newText = detailTaskText.value.trim();
-    if (!newText) {
-      alert('Текст задачи не может быть пустым!');
-      return;
-    }
-    task.text = newText;
-    task.status = detailTaskStatus.value;
-    saveTasks();
-    renderTasks();
-    closeDetailView();
-  };
-
-  // Удалить задачу
-  deleteTaskBtn.onclick = () => {
-    if (!confirm('Удалить задачу?')) return;
-    tasks = tasks.filter(t => t.id !== editingTaskId);
-    saveTasks();
-    renderTasks();
-    closeDetailView();
-  };
-
-  // Отмена редактирования
-  cancelEditBtn.onclick = () => {
-    closeDetailView();
-  };
-
-  // Инициализация
-  renderTasks();
-
-</script>
+  <!-- Модальное окно -->
+  <div id="modal" aria-hidden="true" role="dialog" aria-modal="true">
+    <div class="modal-content">
+      <textarea id="modal-textarea" placeholder="Редактируйте текст задачи"></textarea>
+      <select id="modal-status" aria-label="Выберите статус задачи">
+        <option>В очереди</option>
+        <option>В работе</option>
+        <option>Выполнена</option>
+      </select>
+      <div class="buttons">
+        <button id="modal-save-btn" class="save-btn">Сохранить</button>
+        <button id="modal-delete-btn" class="delete-btn">Удалить</button>
+        <button id="modal-close-btn" class="close-btn">Отмена</button>
+      </div>
+    </div>
+  </div>
 </body>
 </html>
