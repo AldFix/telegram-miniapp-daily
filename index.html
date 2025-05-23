@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <title>Ежедневник++</title>
   <style>
@@ -27,65 +27,59 @@
       border-radius: 10px;
       border: none;
       font-size: 16px;
-      background: #2c2c2c;
-      color: #f0f0f0;
+      box-sizing: border-box;
     }
     button {
       background-color: #4CAF50;
+      color: white;
       cursor: pointer;
-    }
-    button:disabled {
-      background-color: #666;
-      cursor: not-allowed;
     }
     ul {
       padding-left: 0;
       list-style: none;
     }
     li {
-      margin-bottom: 15px;
-      display: flex;
-      align-items: center;
-      justify-content: flex-start;
-      background: #282828;
+      margin-bottom: 10px;
+      background: #2a2a2a;
       border-radius: 15px;
-      padding: 12px 15px;
+      padding: 15px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      flex-wrap: wrap;
     }
-    .task-title-link {
-      white-space: normal;
-      max-width: 100%;
-      overflow-wrap: break-word;
-      color: #80cbc4;
-      text-decoration: none;
+    .task-content {
+      flex: 1 1 70%;
+      word-break: break-word;
       font-size: 16px;
-      cursor: pointer;
+      padding-right: 10px;
     }
-    .task-title-link.completed {
-      text-decoration: line-through;
-      color: #888;
+    .task-status {
+      flex: 1 1 28%;
+      text-align: right;
     }
-    .delete-btn {
-      background-color: #d32f2f;
-      color: white;
-      border: none;
+    .status-select {
+      width: 100%;
       border-radius: 10px;
-      padding: 6px 12px;
       font-size: 14px;
-      cursor: pointer;
-      margin-left: 10px;
-      display: none; /* Скрываем в общем списке */
+      padding: 6px;
+      background-color: #333;
+      color: #f0f0f0;
+      border: none;
     }
-    .card-edit {
-      max-width: 600px;
-      margin: 0 auto;
+    .status-в\ очереди {
+      background-color: #1e3a5f;
     }
-    #status-filter {
-      margin-bottom: 20px;
+    .status-в\ работе {
+      background-color: #3a1f5f;
+    }
+    .status-выполнена {
+      background-color: #1f5f3a;
     }
   </style>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-app.js";
-    import { getDatabase, ref, set, push, onValue, update, remove } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-database.js";
+    import { getDatabase, ref, set, push, get, onValue, update, remove } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyA_E4t3RHWLNtorKm9utOyyRwojkUsUmis",
@@ -112,146 +106,72 @@
       const input = document.getElementById("task-input");
       const btn = document.getElementById("add-task");
       const list = document.getElementById("task-list");
-      const statusFilter = document.getElementById("status-filter");
 
       btn.onclick = async () => {
         const text = input.value.trim();
         if (!text) return;
-        btn.disabled = true;
 
         const taskRef = push(ref(db, `users/${userId}/tasks`));
         await set(taskRef, {
           id: taskRef.key,
           text,
-          status: "В очереди"
+          status: "в очереди"
         });
 
         input.value = "";
-        btn.disabled = false;
       };
 
-      function updateTaskList() {
-        onValue(ref(db, `users/${userId}/tasks`), (snapshot) => {
-          const tasks = snapshot.val() || {};
-          list.innerHTML = "";
-
-          const filterValue = statusFilter.value;
-
-          Object.values(tasks).forEach(task => {
-            if (filterValue !== "Все" && task.status !== filterValue) return;
-
+      const tasksRef = ref(db, `users/${userId}/tasks`);
+      onValue(tasksRef, (snapshot) => {
+        list.innerHTML = "";
+        const data = snapshot.val();
+        if (data) {
+          Object.values(data).forEach(task => {
             const li = document.createElement("li");
 
-            const span = document.createElement("span");
-            span.textContent = task.text;
-            span.className = "task-title-link";
+            const contentDiv = document.createElement("div");
+            contentDiv.className = "task-content";
+            contentDiv.textContent = task.text;
 
-            span.onclick = () => openEditTask(task);
+            const statusDiv = document.createElement("div");
+            statusDiv.className = "task-status";
 
-            li.appendChild(span);
+            const statusSelect = document.createElement("select");
+            statusSelect.className = `status-select status-${task.status}`;
+            ["в очереди", "в работе", "выполнена"].forEach(status => {
+              const option = document.createElement("option");
+              option.value = status;
+              option.textContent = status;
+              if (task.status === status) option.selected = true;
+              statusSelect.appendChild(option);
+            });
+            statusSelect.onchange = () => {
+              update(ref(db, `users/${userId}/tasks/${task.id}`), {
+                status: statusSelect.value
+              });
+            };
+
+            statusDiv.appendChild(statusSelect);
+
+            li.appendChild(contentDiv);
+            li.appendChild(statusDiv);
             list.appendChild(li);
           });
-        }, { onlyOnce: false });
-      }
+        }
+      });
 
-      function openEditTask(task) {
-        const overlay = document.createElement("div");
-        overlay.style = `
-          position: fixed;
-          top: 0; left: 0; right: 0; bottom: 0;
-          background: rgba(0,0,0,0.8);
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          z-index: 1000;
-        `;
-
-        const card = document.createElement("div");
-        card.className = "card card-edit";
-
-        const inputEdit = document.createElement("input");
-        inputEdit.type = "text";
-        inputEdit.value = task.text;
-        inputEdit.style.width = "100%";
-
-        const statusSelect = document.createElement("select");
-        ["В очереди", "В работе", "Выполнена"].forEach(statusOption => {
-          const option = document.createElement("option");
-          option.value = statusOption;
-          option.textContent = statusOption;
-          if (statusOption === task.status) option.selected = true;
-          statusSelect.appendChild(option);
-        });
-        statusSelect.style.marginTop = "10px";
-
-        const saveBtn = document.createElement("button");
-        saveBtn.textContent = "Сохранить";
-        saveBtn.style.marginTop = "10px";
-        saveBtn.onclick = async () => {
-          const newText = inputEdit.value.trim();
-          const newStatus = statusSelect.value;
-          if (!newText) {
-            alert("Текст задачи не может быть пустым!");
-            return;
-          }
-          await update(ref(db, `users/${userId}/tasks/${task.id}`), {
-            text: newText,
-            status: newStatus
-          });
-          document.body.removeChild(overlay);
-        };
-
-        const deleteBtn = document.createElement("button");
-        deleteBtn.textContent = "Удалить";
-        deleteBtn.style.backgroundColor = "#d32f2f";
-        deleteBtn.style.marginTop = "10px";
-        deleteBtn.onclick = () => {
-          if (confirm("Удалить задачу?")) {
-            remove(ref(db, `users/${userId}/tasks/${task.id}`));
-            document.body.removeChild(overlay);
-          }
-        };
-
-        const cancelBtn = document.createElement("button");
-        cancelBtn.textContent = "Отмена";
-        cancelBtn.style.marginTop = "10px";
-        cancelBtn.style.backgroundColor = "#555";
-        cancelBtn.onclick = () => {
-          document.body.removeChild(overlay);
-        };
-
-        card.appendChild(inputEdit);
-        card.appendChild(statusSelect);
-        card.appendChild(saveBtn);
-        card.appendChild(deleteBtn);
-        card.appendChild(cancelBtn);
-
-        overlay.appendChild(card);
-        document.body.appendChild(overlay);
-      }
-
-      statusFilter.onchange = updateTaskList;
-
-      updateTaskList();
+      Telegram.WebApp.expand();
     };
   </script>
 </head>
 <body>
   <div class="card">
-    <h2 id="user-info">Загрузка пользователя...</h2>
-    <input type="text" id="task-input" placeholder="Что нужно сделать?" />
+    <h1 id="user-info">Загрузка...</h1>
+    <input id="task-input" type="text" placeholder="Введите задачу" />
     <button id="add-task">Добавить задачу</button>
   </div>
-
   <div class="card">
-    <label for="status-filter">Фильтр по статусу:</label>
-    <select id="status-filter">
-      <option value="Все">Все</option>
-      <option value="В очереди">В очереди</option>
-      <option value="В работе">В работе</option>
-      <option value="Выполнена">Выполнена</option>
-    </select>
-
+    <h2>Ваши задачи</h2>
     <ul id="task-list"></ul>
   </div>
 </body>
