@@ -3,9 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Ежедневник++</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-
+  <title>Ежедневник++</title>
   <style>
     body {
       margin: 0;
@@ -19,58 +18,28 @@
       padding: 20px;
       border-radius: 20px;
       box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+      margin-bottom: 20px;
     }
-    h1 {
-      font-size: 24px;
-    }
-    form {
-      margin-top: 20px;
-    }
-    input[type="text"] {
-      width: 70%;
-      padding: 8px;
-      border-radius: 8px;
+    input, button {
+      padding: 10px;
+      margin-top: 10px;
+      width: 100%;
+      border-radius: 10px;
       border: none;
-      margin-right: 10px;
       font-size: 16px;
     }
     button {
-      padding: 8px 16px;
-      border-radius: 8px;
-      border: none;
-      background: #3a86ff;
+      background-color: #4CAF50;
       color: white;
       cursor: pointer;
-      font-size: 16px;
     }
     ul {
-      margin-top: 20px;
-      list-style: none;
-      padding: 0;
-    }
-    li {
-      padding: 8px 0;
-      border-bottom: 1px solid #333;
-      font-size: 18px;
+      padding-left: 20px;
     }
   </style>
-</head>
-<body>
-  <div class="card">
-    <h1 id="user-info">Загрузка...</h1>
-    <p>Добро пожаловать в Telegram Mini App "Ежедневник++"!</p>
-
-    <form id="task-form">
-      <input type="text" id="task-input" placeholder="Введите задачу" required />
-      <button type="submit">Добавить</button>
-    </form>
-
-    <ul id="task-list"></ul>
-  </div>
-
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-app.js";
-    import { getDatabase, ref, set, get } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-database.js";
+    import { getDatabase, ref, set, push, get, onValue } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyA_E4t3RHWLNtorKm9utOyyRwojkUsUmis",
@@ -85,54 +54,53 @@
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
-    // Приветствие пользователя Telegram
     window.onload = () => {
-      const user = window.Telegram.WebApp.initDataUnsafe?.user;
+      const tgUser = window.Telegram.WebApp.initDataUnsafe?.user;
+      const userId = tgUser?.id;
+
       document.getElementById("user-info").textContent =
-        user ? `Привет, ${user.first_name} 👋` : "Не авторизован";
-      Telegram.WebApp.expand();
-      loadTasks();
-    };
+        tgUser ? `Привет, ${tgUser.first_name} 👋` : "Не авторизован через Telegram";
 
-    const taskForm = document.getElementById('task-form');
-    const taskInput = document.getElementById('task-input');
-    const taskList = document.getElementById('task-list');
+      if (!userId) return;
 
-    function addTask(taskText) {
-      const taskId = Date.now().toString();
-      set(ref(db, 'tasks/' + taskId), {
-        text: taskText,
-        done: false
-      });
-    }
+      const input = document.getElementById("task-input");
+      const btn = document.getElementById("add-task");
+      const list = document.getElementById("task-list");
 
-    function loadTasks() {
-      get(ref(db, 'tasks')).then(snapshot => {
-        taskList.innerHTML = '';
-        if (snapshot.exists()) {
-          const tasks = snapshot.val();
-          for (const id in tasks) {
-            const task = tasks[id];
-            const li = document.createElement('li');
-            li.textContent = task.done ? `✅ ${task.text}` : task.text;
-            taskList.appendChild(li);
-          }
-        } else {
-          taskList.textContent = 'Задачи отсутствуют';
+      btn.onclick = () => {
+        const text = input.value.trim();
+        if (!text) return;
+        const taskRef = push(ref(db, `users/${userId}/tasks`));
+        set(taskRef, { text, status: "в очереди" });
+        input.value = "";
+      };
+
+      const tasksRef = ref(db, `users/${userId}/tasks`);
+      onValue(tasksRef, (snapshot) => {
+        list.innerHTML = "";
+        const data = snapshot.val();
+        if (data) {
+          Object.values(data).forEach(task => {
+            const li = document.createElement("li");
+            li.textContent = `${task.text} (${task.status})`;
+            list.appendChild(li);
+          });
         }
       });
-    }
 
-    taskForm.addEventListener('submit', e => {
-      e.preventDefault();
-      const text = taskInput.value.trim();
-      if (text) {
-        addTask(text);
-        taskInput.value = '';
-        loadTasks();
-      }
-    });
+      Telegram.WebApp.expand();
+    };
   </script>
+</head>
+<body>
+  <div class="card">
+    <h1 id="user-info">Загрузка...</h1>
+    <input id="task-input" type="text" placeholder="Введите задачу" />
+    <button id="add-task">Добавить задачу</button>
+  </div>
+  <div class="card">
+    <h2>Ваши задачи</h2>
+    <ul id="task-list"></ul>
+  </div>
 </body>
 </html>
-
