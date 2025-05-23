@@ -28,7 +28,7 @@
       border: none;
       font-size: 16px;
       box-sizing: border-box;
-      background-color: #2a2a2a;
+      background: #2a2a2a;
       color: #f0f0f0;
     }
     button {
@@ -59,11 +59,9 @@
       border-radius: 10px;
       display: inline-block;
       margin-top: 10px;
-      background-color: #394040;
-      color: #dddddd;
     }
-    .status-В\\ очереди { background-color: #2c2c2c; color: #bbbbbb; }
-    .status-В\\ работе { background-color: #394040; color: #dddddd; }
+    .status-В\ очереди { background-color: #2c2c2c; color: #bbbbbb; }
+    .status-В\ работе { background-color: #394040; color: #dddddd; }
     .status-Выполнена { background-color: #335533; color: #c0ffc0; }
 
     .task-actions {
@@ -82,11 +80,68 @@
     .delete-btn {
       background-color: #d32f2f;
     }
-    label {
-      margin-top: 10px;
+
+    /* Модальное окно */
+    .modal-bg {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.7);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    }
+    .modal {
+      background: #1f1f1f;
+      padding: 20px;
+      border-radius: 20px;
+      width: 90%;
+      max-width: 400px;
+      box-shadow: 0 0 15px rgba(0,0,0,0.8);
+    }
+    .modal h2 {
+      margin-top: 0;
+      color: #4CAF50;
+    }
+    .modal label {
       display: block;
-      font-size: 14px;
-      color: #aaa;
+      margin-top: 15px;
+      font-weight: 600;
+    }
+    .modal input, .modal select {
+      width: 100%;
+      margin-top: 5px;
+      background: #2a2a2a;
+      border: none;
+      border-radius: 10px;
+      padding: 10px;
+      color: #f0f0f0;
+      font-size: 16px;
+      box-sizing: border-box;
+    }
+    .modal-buttons {
+      margin-top: 20px;
+      text-align: right;
+    }
+    .modal-buttons button {
+      width: auto;
+      padding: 10px 20px;
+      margin-left: 10px;
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 16px;
+    }
+    .btn-cancel {
+      background: #777;
+      color: #eee;
+      cursor: pointer;
+      border: none;
+    }
+    .btn-save {
+      background-color: #4CAF50;
+      color: white;
+      cursor: pointer;
+      border: none;
     }
   </style>
   <script type="module">
@@ -117,8 +172,6 @@
 
       if (!userId) return;
 
-      const input = document.getElementById("task-input");
-      const addBtn = document.getElementById("add-task");
       const list = document.getElementById("task-list");
       const statusFilter = document.getElementById("status-filter");
       const dateFrom = document.getElementById("date-from");
@@ -126,21 +179,52 @@
 
       let tasks = [];
 
-      addBtn.onclick = async () => {
-        const text = input.value.trim();
-        if (!text) return;
+      // Модальное окно элементы
+      const modalBg = document.getElementById("modal-bg");
+      const modal = document.getElementById("modal");
+      const addTaskBtn = document.getElementById("add-task");
+      const modalInput = document.getElementById("modal-task-input");
+      const modalStatus = document.getElementById("modal-task-status");
+      const modalDate = document.getElementById("modal-task-date");
+      const saveBtn = document.getElementById("modal-save-btn");
+      const cancelBtn = document.getElementById("modal-cancel-btn");
+
+      // Открыть модалку
+      addTaskBtn.onclick = () => {
+        modalInput.value = "";
+        modalStatus.value = "В очереди";
+        modalDate.value = "";
+        modalBg.style.display = "flex";
+      };
+
+      // Закрыть модалку
+      cancelBtn.onclick = () => {
+        modalBg.style.display = "none";
+      };
+
+      // Сохранить задачу
+      saveBtn.onclick = async () => {
+        const text = modalInput.value.trim();
+        const status = modalStatus.value;
+        const date = modalDate.value;
+
+        if (!text) {
+          alert("Введите название задачи");
+          return;
+        }
 
         const taskRef = push(ref(db, `users/${userId}/tasks`));
         await set(taskRef, {
           id: taskRef.key,
           text,
-          status: "В очереди",
-          date: "" // пустая дата по умолчанию
+          status,
+          date: date || null
         });
 
-        input.value = "";
+        modalBg.style.display = "none";
       };
 
+      // Загрузка задач и слушатель обновлений
       const tasksRef = ref(db, `users/${userId}/tasks`);
       onValue(tasksRef, (snapshot) => {
         const data = snapshot.val();
@@ -154,28 +238,27 @@
 
       function renderTasks() {
         list.innerHTML = "";
-
         const selectedStatus = statusFilter.value;
-        const from = dateFrom.value;
-        const to = dateTo.value;
+        const fromDate = dateFrom.value ? new Date(dateFrom.value) : null;
+        const toDate = dateTo.value ? new Date(dateTo.value) : null;
 
-        // Фильтруем задачи по статусу и дате
-        let filtered = tasks.filter(task => {
-          // Статус
-          if (selectedStatus && task.status !== selectedStatus) return false;
+        // Фильтрация и сортировка
+        let filtered = tasks;
 
-          // Дата (если задана)
-          if (from && (!task.date || task.date < from)) return false;
-          if (to && (!task.date || task.date > to)) return false;
+        if (selectedStatus) {
+          filtered = filtered.filter(t => t.status === selectedStatus);
+        }
+        if (fromDate) {
+          filtered = filtered.filter(t => t.date && new Date(t.date) >= fromDate);
+        }
+        if (toDate) {
+          filtered = filtered.filter(t => t.date && new Date(t.date) <= toDate);
+        }
 
-          return true;
-        });
-
-        // Сортируем по дате (пустые даты в конце)
         filtered.sort((a, b) => {
           if (!a.date) return 1;
           if (!b.date) return -1;
-          return a.date.localeCompare(b.date);
+          return new Date(a.date) - new Date(b.date);
         });
 
         filtered.forEach(task => {
@@ -185,6 +268,7 @@
           title.className = "task-name";
           title.textContent = task.text;
           title.onclick = async () => {
+            // Редактируем название задачи
             const newText = prompt("Редактировать задачу:", task.text);
             if (newText) {
               await update(ref(db, `users/${userId}/tasks/${task.id}`), { text: newText });
@@ -205,50 +289,42 @@
           };
           status.className = `task-status status-${task.status.replace(" ", "\\ ")}`;
 
-          // Добавим дату выполнения рядом с задачей
-          const dateLabel = document.createElement("input");
-          dateLabel.type = "date";
-          dateLabel.value = task.date || "";
-          dateLabel.style.marginTop = "10px";
-          dateLabel.style.width = "auto";
-          dateLabel.onchange = async () => {
-            await update(ref(db, `users/${userId}/tasks/${task.id}`), { date: dateLabel.value });
+          const date = document.createElement("input");
+          date.type = "date";
+          date.value = task.date || "";
+          date.onchange = async () => {
+            await update(ref(db, `users/${userId}/tasks/${task.id}`), { date: date.value });
             renderTasks();
           };
-
-          const actions = document.createElement("div");
-          actions.className = "task-actions";
 
           const delBtn = document.createElement("button");
           delBtn.textContent = "Удалить";
           delBtn.className = "delete-btn";
-          delBtn.onclick = () => {
-            if (confirm("Удалить задачу?")) {
-              remove(ref(db, `users/${userId}/tasks/${task.id}`));
+          delBtn.onclick = async () => {
+            if (confirm("Удалить эту задачу?")) {
+              await remove(ref(db, `users/${userId}/tasks/${task.id}`));
             }
           };
 
-          actions.appendChild(status);
-          actions.appendChild(delBtn);
-
           li.appendChild(title);
-          li.appendChild(actions);
-          li.appendChild(dateLabel);
+          li.appendChild(status);
+          li.appendChild(date);
+          li.appendChild(delBtn);
 
           list.appendChild(li);
         });
       }
-
-      Telegram.WebApp.expand();
     };
   </script>
 </head>
 <body>
-  <div class="card">
-    <h1 id="user-info">Загрузка...</h1>
-    <input id="task-input" type="text" placeholder="Введите задачу" />
-    <button id="add-task">Добавить задачу</button>
+  <div id="user-info" style="margin-bottom: 10px; font-weight: bold;"></div>
 
+  <div class="card">
+    <button id="add-task">➕ Добавить задачу</button>
+  </div>
+
+  <div class="card">
     <label for="status-filter">Фильтр по статусу:</label>
     <select id="status-filter">
       <option value="">Все</option>
@@ -257,13 +333,36 @@
       <option value="Выполнена">Выполнена</option>
     </select>
 
-    <label for="date-from">Дата выполнения с:</label>
+    <label for="date-from" style="margin-top: 15px;">Дата с:</label>
     <input type="date" id="date-from" />
-
-    <label for="date-to">Дата выполнения по:</label>
+    <label for="date-to" style="margin-top: 15px;">Дата по:</label>
     <input type="date" id="date-to" />
+  </div>
 
-    <ul id="task-list"></ul>
+  <ul id="task-list"></ul>
+
+  <!-- Модальное окно -->
+  <div class="modal-bg" id="modal-bg">
+    <div class="modal" id="modal">
+      <h2>Новая задача</h2>
+      <label for="modal-task-input">Название задачи:</label>
+      <input type="text" id="modal-task-input" placeholder="Например: купить пиццу" />
+
+      <label for="modal-task-status">Статус:</label>
+      <select id="modal-task-status">
+        <option value="В очереди">В очереди</option>
+        <option value="В работе">В работе</option>
+        <option value="Выполнена">Выполнена</option>
+      </select>
+
+      <label for="modal-task-date">Дата выполнения:</label>
+      <input type="date" id="modal-task-date" />
+
+      <div class="modal-buttons">
+        <button class="btn-cancel" id="modal-cancel-btn">Отмена</button>
+        <button class="btn-save" id="modal-save-btn">Сохранить</button>
+      </div>
+    </div>
   </div>
 </body>
 </html>
