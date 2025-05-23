@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -20,7 +21,7 @@
       box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
       margin-bottom: 20px;
     }
-    input, button, select {
+    input, select, button {
       padding: 10px;
       margin-top: 10px;
       width: 100%;
@@ -36,50 +37,52 @@
     }
     ul {
       padding-left: 0;
-      list-style: none;
+      list-style-type: none;
     }
     li {
-      margin-bottom: 10px;
+      margin-bottom: 15px;
       background: #2a2a2a;
-      border-radius: 15px;
       padding: 15px;
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      flex-wrap: wrap;
+      border-radius: 15px;
     }
-    .task-content {
-      flex: 1 1 70%;
-      word-break: break-word;
+    .task-name {
       font-size: 16px;
-      padding-right: 10px;
+      margin-bottom: 10px;
+      word-break: break-word;
     }
     .task-status {
-      flex: 1 1 28%;
-      text-align: right;
-    }
-    .status-select {
-      width: 100%;
-      border-radius: 10px;
       font-size: 14px;
-      padding: 6px;
+      font-weight: bold;
+      padding: 5px 10px;
+      border-radius: 10px;
+      display: inline-block;
+    }
+    .status-в очереди { background-color: #333; color: #ccc; }
+    .status-в работе { background-color: #444; color: #ddd; }
+    .status-выполнена { background-color: #555; color: #eee; }
+
+    .task-actions {
+      margin-top: 10px;
+    }
+    .edit-btn, .delete-btn {
       background-color: #333;
-      color: #f0f0f0;
+      color: white;
       border: none;
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-size: 14px;
+      margin-right: 10px;
+      cursor: pointer;
     }
-    .status-в\ очереди {
-      background-color: #1e3a5f;
-    }
-    .status-в\ работе {
-      background-color: #3a1f5f;
-    }
-    .status-выполнена {
-      background-color: #1f5f3a;
+    .delete-btn {
+      background-color: #d32f2f;
     }
   </style>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-app.js";
-    import { getDatabase, ref, set, push, get, onValue, update, remove } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-database.js";
+    import {
+      getDatabase, ref, set, push, get, onValue, update, remove
+    } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyA_E4t3RHWLNtorKm9utOyyRwojkUsUmis",
@@ -104,10 +107,13 @@
       if (!userId) return;
 
       const input = document.getElementById("task-input");
-      const btn = document.getElementById("add-task");
+      const addBtn = document.getElementById("add-task");
       const list = document.getElementById("task-list");
+      const statusFilter = document.getElementById("status-filter");
 
-      btn.onclick = async () => {
+      let tasks = [];
+
+      addBtn.onclick = async () => {
         const text = input.value.trim();
         if (!text) return;
 
@@ -123,42 +129,65 @@
 
       const tasksRef = ref(db, `users/${userId}/tasks`);
       onValue(tasksRef, (snapshot) => {
-        list.innerHTML = "";
         const data = snapshot.val();
-        if (data) {
-          Object.values(data).forEach(task => {
-            const li = document.createElement("li");
-
-            const contentDiv = document.createElement("div");
-            contentDiv.className = "task-content";
-            contentDiv.textContent = task.text;
-
-            const statusDiv = document.createElement("div");
-            statusDiv.className = "task-status";
-
-            const statusSelect = document.createElement("select");
-            statusSelect.className = `status-select status-${task.status}`;
-            ["в очереди", "в работе", "выполнена"].forEach(status => {
-              const option = document.createElement("option");
-              option.value = status;
-              option.textContent = status;
-              if (task.status === status) option.selected = true;
-              statusSelect.appendChild(option);
-            });
-            statusSelect.onchange = () => {
-              update(ref(db, `users/${userId}/tasks/${task.id}`), {
-                status: statusSelect.value
-              });
-            };
-
-            statusDiv.appendChild(statusSelect);
-
-            li.appendChild(contentDiv);
-            li.appendChild(statusDiv);
-            list.appendChild(li);
-          });
-        }
+        tasks = data ? Object.values(data) : [];
+        renderTasks();
       });
+
+      statusFilter.onchange = renderTasks;
+
+      function renderTasks() {
+        list.innerHTML = "";
+        const filtered = statusFilter.value
+          ? tasks.filter(t => t.status === statusFilter.value)
+          : tasks;
+
+        filtered.forEach(task => {
+          const li = document.createElement("li");
+
+          const title = document.createElement("div");
+          title.className = "task-name";
+          title.textContent = task.text;
+          title.onclick = () => {
+            const newText = prompt("Редактировать задачу:", task.text);
+            if (newText) {
+              update(ref(db, `users/${userId}/tasks/${task.id}`), { text: newText });
+            }
+          };
+
+          const status = document.createElement("select");
+          ["в очереди", "в работе", "выполнена"].forEach(s => {
+            const option = document.createElement("option");
+            option.value = s;
+            option.textContent = s;
+            if (task.status === s) option.selected = true;
+            status.appendChild(option);
+          });
+          status.onchange = () => {
+            update(ref(db, `users/${userId}/tasks/${task.id}`), { status: status.value });
+          };
+          status.className = `task-status status-${task.status}`;
+
+          const actions = document.createElement("div");
+          actions.className = "task-actions";
+
+          const delBtn = document.createElement("button");
+          delBtn.textContent = "Удалить";
+          delBtn.className = "delete-btn";
+          delBtn.onclick = () => {
+            if (confirm("Удалить задачу?")) {
+              remove(ref(db, `users/${userId}/tasks/${task.id}`));
+            }
+          };
+
+          actions.appendChild(status);
+          actions.appendChild(delBtn);
+
+          li.appendChild(title);
+          li.appendChild(actions);
+          list.appendChild(li);
+        });
+      }
 
       Telegram.WebApp.expand();
     };
@@ -169,6 +198,12 @@
     <h1 id="user-info">Загрузка...</h1>
     <input id="task-input" type="text" placeholder="Введите задачу" />
     <button id="add-task">Добавить задачу</button>
+    <select id="status-filter">
+      <option value="">Все</option>
+      <option value="в очереди">В очереди</option>
+      <option value="в работе">В работе</option>
+      <option value="выполнена">Выполнена</option>
+    </select>
   </div>
   <div class="card">
     <h2>Ваши задачи</h2>
