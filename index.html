@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -56,10 +55,11 @@
       padding: 5px 10px;
       border-radius: 10px;
       display: inline-block;
+      margin-top: 10px;
     }
-    .status-В очереди { background-color: #333; color: #ccc; }
-    .status-В работе { background-color: #444; color: #ddd; }
-    .status-Выполнена { background-color: #555; color: #eee; }
+    .status-В\ очереди { background-color: #2c2c2c; color: #bbbbbb; }
+    .status-В\ работе { background-color: #394040; color: #dddddd; }
+    .status-Выполнена { background-color: #335533; color: #c0ffc0; }
 
     .task-actions {
       margin-top: 10px;
@@ -138,8 +138,9 @@
 
       function renderTasks() {
         list.innerHTML = "";
-        const filtered = statusFilter.value
-          ? tasks.filter(t => t.status === statusFilter.value)
+        const selectedStatus = statusFilter.value;
+        const filtered = selectedStatus
+          ? tasks.filter(t => t.status === selectedStatus)
           : tasks;
 
         filtered.forEach(task => {
@@ -166,7 +167,7 @@
           status.onchange = () => {
             update(ref(db, `users/${userId}/tasks/${task.id}`), { status: status.value });
           };
-          status.className = `task-status status-${task.status}`;
+          status.className = `task-status status-${task.status.replace(" ", "\\ ")}`;
 
           const actions = document.createElement("div");
           actions.className = "task-actions";
@@ -200,9 +201,9 @@
     <button id="add-task">Добавить задачу</button>
     <select id="status-filter">
       <option value="">Все</option>
-      <option value="в очереди">В очереди</option>
-      <option value="в работе">В работе</option>
-      <option value="выполнена">Выполнена</option>
+      <option value="В очереди">В очереди</option>
+      <option value="В работе">В работе</option>
+      <option value="Выполнена">Выполнена</option>
     </select>
   </div>
   <div class="card">
