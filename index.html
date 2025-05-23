@@ -36,10 +36,16 @@
     ul {
       padding-left: 20px;
     }
+    li {
+      margin-bottom: 10px;
+    }
+    .checkbox {
+      margin-right: 10px;
+    }
   </style>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-app.js";
-    import { getDatabase, ref, set, push, get, onValue } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-database.js";
+    import { getDatabase, ref, set, push, get, onValue, update } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyA_E4t3RHWLNtorKm9utOyyRwojkUsUmis",
@@ -71,7 +77,12 @@
         const text = input.value.trim();
         if (!text) return;
         const taskRef = push(ref(db, `users/${userId}/tasks`));
-        set(taskRef, { text, status: "в очереди" });
+        set(taskRef, {
+          id: taskRef.key,
+          text,
+          status: "в очереди",
+          completed: false
+        });
         input.value = "";
       };
 
@@ -82,7 +93,22 @@
         if (data) {
           Object.values(data).forEach(task => {
             const li = document.createElement("li");
-            li.textContent = `${task.text} (${task.status})`;
+
+            const checkbox = document.createElement("input");
+            checkbox.type = "checkbox";
+            checkbox.className = "checkbox";
+            checkbox.checked = task.completed;
+            checkbox.onchange = () => {
+              update(ref(db, `users/${userId}/tasks/${task.id}`), {
+                completed: checkbox.checked
+              });
+            };
+
+            const span = document.createElement("span");
+            span.textContent = `${task.text} (${task.status})`;
+
+            li.appendChild(checkbox);
+            li.appendChild(span);
             list.appendChild(li);
           });
         }
@@ -96,11 +122,4 @@
   <div class="card">
     <h1 id="user-info">Загрузка...</h1>
     <input id="task-input" type="text" placeholder="Введите задачу" />
-    <button id="add-task">Добавить задачу</button>
-  </div>
-  <div class="card">
-    <h2>Ваши задачи</h2>
-    <ul id="task-list"></ul>
-  </div>
-</body>
-</html>
+    <button id="add-task">Добавить зад
