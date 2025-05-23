@@ -121,7 +121,7 @@
         await set(taskRef, {
           id: taskRef.key,
           text,
-          status: "в очереди"
+          status: "В очереди"
         });
 
         input.value = "";
@@ -156,7 +156,7 @@
           };
 
           const status = document.createElement("select");
-          ["в очереди", "в работе", "выполнена"].forEach(s => {
+          ["В очереди", "В работе", "Выполнена"].forEach(s => {
             const option = document.createElement("option");
             option.value = s;
             option.textContent = s;
