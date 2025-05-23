@@ -1,58 +1,11 @@
-
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-app.js";
-  import { getDatabase, ref, set, get, child } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-database.js";
-
-  const firebaseConfig = {
-    apiKey: "AIzaSyA_E4t3RHWLNtorKm9utOyyRwojkUsUmis",
-    authDomain: "telegramminiappdaily.firebaseapp.com",
-    databaseURL: "https://telegramminiappdaily-default-rtdb.europe-west1.firebasedatabase.app",
-    projectId: "telegramminiappdaily",
-    storageBucket: "telegramminiappdaily.appspot.com",
-    messagingSenderId: "324821981446",
-    appId: "1:324821981446:web:bad97b2c34a73087e2e687"
-  };
-
-  const app = initializeApp(firebaseConfig);
-  const db = getDatabase(app);
-
-  // Пример — запись данных (потом заменим на задачи)
-  function writeTestData() {
-    set(ref(db, 'test/user1'), {
-      name: 'Иван',
-      status: 'online'
-    });
-  }
-
-  writeTestData();
-
-  // Пример — чтение данных
-  const dbRef = ref(db);
-  get(child(dbRef, 'test/user1')).then(snapshot => {
-    if (snapshot.exists()) {
-      console.log('Данные из базы:', snapshot.val());
-    } else {
-      console.log('Нет данных');
-    }
-  }).catch(error => {
-    console.error('Ошибка чтения:', error);
-  });
-</script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <title>Ежедневник++</title>
-  <script>
-    window.onload = () => {
-      const user = window.Telegram.WebApp.initDataUnsafe?.user;
-      document.getElementById("user-info").textContent =
-        user ? `Привет, ${user.first_name} 👋` : "Не авторизован";
-      Telegram.WebApp.expand();
-    };
-  </script>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
   <style>
     body {
       margin: 0;
@@ -70,13 +23,116 @@
     h1 {
       font-size: 24px;
     }
+    form {
+      margin-top: 20px;
+    }
+    input[type="text"] {
+      width: 70%;
+      padding: 8px;
+      border-radius: 8px;
+      border: none;
+      margin-right: 10px;
+      font-size: 16px;
+    }
+    button {
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: none;
+      background: #3a86ff;
+      color: white;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    ul {
+      margin-top: 20px;
+      list-style: none;
+      padding: 0;
+    }
+    li {
+      padding: 8px 0;
+      border-bottom: 1px solid #333;
+      font-size: 18px;
+    }
   </style>
 </head>
 <body>
   <div class="card">
     <h1 id="user-info">Загрузка...</h1>
     <p>Добро пожаловать в Telegram Mini App "Ежедневник++"!</p>
-    <p>Скоро здесь появятся ваши проекты и задачи 🗂️</p>
+
+    <form id="task-form">
+      <input type="text" id="task-input" placeholder="Введите задачу" required />
+      <button type="submit">Добавить</button>
+    </form>
+
+    <ul id="task-list"></ul>
   </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-app.js";
+    import { getDatabase, ref, set, get } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyA_E4t3RHWLNtorKm9utOyyRwojkUsUmis",
+      authDomain: "telegramminiappdaily.firebaseapp.com",
+      databaseURL: "https://telegramminiappdaily-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "telegramminiappdaily",
+      storageBucket: "telegramminiappdaily.appspot.com",
+      messagingSenderId: "324821981446",
+      appId: "1:324821981446:web:bad97b2c34a73087e2e687"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    // Приветствие пользователя Telegram
+    window.onload = () => {
+      const user = window.Telegram.WebApp.initDataUnsafe?.user;
+      document.getElementById("user-info").textContent =
+        user ? `Привет, ${user.first_name} 👋` : "Не авторизован";
+      Telegram.WebApp.expand();
+      loadTasks();
+    };
+
+    const taskForm = document.getElementById('task-form');
+    const taskInput = document.getElementById('task-input');
+    const taskList = document.getElementById('task-list');
+
+    function addTask(taskText) {
+      const taskId = Date.now().toString();
+      set(ref(db, 'tasks/' + taskId), {
+        text: taskText,
+        done: false
+      });
+    }
+
+    function loadTasks() {
+      get(ref(db, 'tasks')).then(snapshot => {
+        taskList.innerHTML = '';
+        if (snapshot.exists()) {
+          const tasks = snapshot.val();
+          for (const id in tasks) {
+            const task = tasks[id];
+            const li = document.createElement('li');
+            li.textContent = task.done ? `✅ ${task.text}` : task.text;
+            taskList.appendChild(li);
+          }
+        } else {
+          taskList.textContent = 'Задачи отсутствуют';
+        }
+      });
+    }
+
+    taskForm.addEventListener('submit', e => {
+      e.preventDefault();
+      const text = taskInput.value.trim();
+      if (text) {
+        addTask(text);
+        taskInput.value = '';
+        loadTasks();
+      }
+    });
+  </script>
 </body>
 </html>
+
