@@ -20,7 +20,7 @@
       box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
       margin-bottom: 20px;
     }
-    input, button {
+    input, select, button {
       padding: 10px;
       margin-top: 10px;
       width: 100%;
@@ -59,6 +59,22 @@
       font-size: 14px;
       cursor: pointer;
       margin-left: 10px;
+    }
+    .task-text {
+      cursor: pointer;
+    }
+    .edit-input {
+      font-size: 16px;
+      padding: 4px;
+      border-radius: 6px;
+      border: none;
+      width: 100%;
+    }
+    .status-select {
+      margin-left: 10px;
+      font-size: 14px;
+      padding: 6px;
+      border-radius: 10px;
     }
   </style>
   <script type="module">
@@ -128,14 +144,48 @@
             };
 
             const span = document.createElement("span");
-            span.textContent = `${task.text} (${task.status})`;
+            span.className = "task-text";
+            span.textContent = task.text;
             if (task.completed) {
               span.style.textDecoration = "line-through";
               span.style.color = "#888";
             }
 
+            span.onclick = () => {
+              const input = document.createElement("input");
+              input.type = "text";
+              input.value = task.text;
+              input.className = "edit-input";
+              input.onblur = () => {
+                const newText = input.value.trim();
+                if (newText && newText !== task.text) {
+                  update(ref(db, `users/${userId}/tasks/${task.id}`), {
+                    text: newText
+                  });
+                }
+              };
+              span.replaceWith(input);
+              input.focus();
+            };
+
+            const statusSelect = document.createElement("select");
+            statusSelect.className = "status-select";
+            ["в очереди", "в работе", "выполнена"].forEach(status => {
+              const option = document.createElement("option");
+              option.value = status;
+              option.textContent = status;
+              if (task.status === status) option.selected = true;
+              statusSelect.appendChild(option);
+            });
+            statusSelect.onchange = () => {
+              update(ref(db, `users/${userId}/tasks/${task.id}`), {
+                status: statusSelect.value
+              });
+            };
+
             leftDiv.appendChild(checkbox);
             leftDiv.appendChild(span);
+            leftDiv.appendChild(statusSelect);
 
             const delBtn = document.createElement("button");
             delBtn.textContent = "🗑";
@@ -169,4 +219,3 @@
   </div>
 </body>
 </html>
-
