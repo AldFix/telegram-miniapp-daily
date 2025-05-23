@@ -38,14 +38,32 @@
     }
     li {
       margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
     }
     .checkbox {
       margin-right: 10px;
     }
+    .task-left {
+      display: flex;
+      align-items: center;
+      flex-grow: 1;
+    }
+    .delete-btn {
+      background-color: #d32f2f;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      padding: 6px 12px;
+      font-size: 14px;
+      cursor: pointer;
+      margin-left: 10px;
+    }
   </style>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-app.js";
-    import { getDatabase, ref, set, push, get, onValue, update } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-database.js";
+    import { getDatabase, ref, set, push, get, onValue, update, remove } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyA_E4t3RHWLNtorKm9utOyyRwojkUsUmis",
@@ -96,6 +114,9 @@
           Object.values(data).forEach(task => {
             const li = document.createElement("li");
 
+            const leftDiv = document.createElement("div");
+            leftDiv.className = "task-left";
+
             const checkbox = document.createElement("input");
             checkbox.type = "checkbox";
             checkbox.className = "checkbox";
@@ -113,8 +134,20 @@
               span.style.color = "#888";
             }
 
-            li.appendChild(checkbox);
-            li.appendChild(span);
+            leftDiv.appendChild(checkbox);
+            leftDiv.appendChild(span);
+
+            const delBtn = document.createElement("button");
+            delBtn.textContent = "🗑";
+            delBtn.className = "delete-btn";
+            delBtn.onclick = () => {
+              if (confirm("Удалить задачу?")) {
+                remove(ref(db, `users/${userId}/tasks/${task.id}`));
+              }
+            };
+
+            li.appendChild(leftDiv);
+            li.appendChild(delBtn);
             list.appendChild(li);
           });
         }
