@@ -1,221 +1,182 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <title>Ежедневник++</title>
-  <style>
-    body {
-      margin: 0;
-      font-family: sans-serif;
-      background-color: #121212;
-      color: #f0f0f0;
-      padding: 20px;
-    }
-    .card {
-      background: #1f1f1f;
-      padding: 20px;
-      border-radius: 20px;
-      box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
-      margin-bottom: 20px;
-    }
-    input, select, button {
-      padding: 10px;
-      margin-top: 10px;
-      width: 100%;
-      border-radius: 10px;
-      border: none;
-      font-size: 16px;
-    }
-    button {
-      background-color: #4CAF50;
-      color: white;
-      cursor: pointer;
-    }
-    ul {
-      padding-left: 20px;
-    }
-    li {
-      margin-bottom: 10px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    .checkbox {
-      margin-right: 10px;
-    }
-    .task-left {
-      display: flex;
-      align-items: center;
-      flex-grow: 1;
-    }
-    .delete-btn {
-      background-color: #d32f2f;
-      color: white;
-      border: none;
-      border-radius: 10px;
-      padding: 6px 12px;
-      font-size: 14px;
-      cursor: pointer;
-      margin-left: 10px;
-    }
-    .task-text {
-      cursor: pointer;
-    }
-    .edit-input {
-      font-size: 16px;
-      padding: 4px;
-      border-radius: 6px;
-      border: none;
-      width: 100%;
-    }
-    .status-select {
-      margin-left: 10px;
-      font-size: 14px;
-      padding: 6px;
-      border-radius: 10px;
-    }
-  </style>
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-app.js";
-    import { getDatabase, ref, set, push, get, onValue, update, remove } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-database.js";
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Ежедневник++</title>
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-app.js";
+  import { getDatabase, ref, set, get, update, onValue } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-database.js";
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyA_E4t3RHWLNtorKm9utOyyRwojkUsUmis",
-      authDomain: "telegramminiappdaily.firebaseapp.com",
-      databaseURL: "https://telegramminiappdaily-default-rtdb.europe-west1.firebasedatabase.app",
-      projectId: "telegramminiappdaily",
-      storageBucket: "telegramminiappdaily.appspot.com",
-      messagingSenderId: "324821981446",
-      appId: "1:324821981446:web:bad97b2c34a73087e2e687"
-    };
+  const firebaseConfig = {
+    apiKey: "AIzaSyA_E4t3RHWLNtorKm9utOyyRwojkUsUmis",
+    authDomain: "telegramminiappdaily.firebaseapp.com",
+    databaseURL: "https://telegramminiappdaily-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "telegramminiappdaily",
+    storageBucket: "telegramminiappdaily.appspot.com",
+    messagingSenderId: "324821981446",
+    appId: "1:324821981446:web:bad97b2c34a73087e2e687"
+  };
 
-    const app = initializeApp(firebaseConfig);
-    const db = getDatabase(app);
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
 
-    window.onload = () => {
-      const tgUser = window.Telegram.WebApp.initDataUnsafe?.user;
-      const userId = tgUser?.id;
+  const user = window.Telegram?.WebApp?.initDataUnsafe?.user || { id: "guest" };
+  const userId = user.id;
 
-      document.getElementById("user-info").textContent =
-        tgUser ? `Привет, ${tgUser.first_name} 👋` : "Не авторизован через Telegram";
+  // DOM Elements
+  const tasksContainer = document.getElementById('tasks');
+  const inputTask = document.getElementById('inputTask');
+  const btnAdd = document.getElementById('btnAdd');
 
-      if (!userId) return;
+  // Статусы
+  const statuses = {
+    todo: "В очереди",
+    inprogress: "В работе",
+    done: "Выполнено"
+  };
 
-      const input = document.getElementById("task-input");
-      const btn = document.getElementById("add-task");
-      const list = document.getElementById("task-list");
+  // Добавить задачу в БД
+  function addTask(text) {
+    if (!text.trim()) return;
+    const id = Date.now().toString(); // простое уникальное id
+    const taskRef = ref(db, `tasks/${userId}/${id}`);
+    set(taskRef, {
+      id,
+      text,
+      status: "todo",
+      completed: false
+    });
+    inputTask.value = '';
+  }
 
-      btn.onclick = async () => {
-        const text = input.value.trim();
-        if (!text) return;
+  // Обновить статус задачи
+  function updateTaskStatus(taskId, newStatus) {
+    const taskRef = ref(db, `tasks/${userId}/${taskId}`);
+    update(taskRef, { status: newStatus });
+  }
 
-        const taskRef = push(ref(db, `users/${userId}/tasks`));
-        await set(taskRef, {
-          id: taskRef.key,
-          text,
-          status: "в очереди",
-          completed: false
+  // Отрисовка задач
+  function renderTasks(tasks) {
+    tasksContainer.innerHTML = '';
+
+    Object.values(tasks).forEach(task => {
+      const taskDiv = document.createElement('div');
+      taskDiv.style.background = '#1f1f1f';
+      taskDiv.style.borderRadius = '10px';
+      taskDiv.style.padding = '10px';
+      taskDiv.style.margin = '10px 0';
+      taskDiv.style.display = 'flex';
+      taskDiv.style.justifyContent = 'space-between';
+      taskDiv.style.alignItems = 'center';
+
+      // Текст задачи
+      const textSpan = document.createElement('span');
+      textSpan.textContent = task.text;
+      textSpan.style.flex = '1';
+      textSpan.style.cursor = 'pointer';
+
+      // Статус (текст)
+      const statusSpan = document.createElement('span');
+      statusSpan.textContent = statuses[task.status];
+      statusSpan.style.marginLeft = '15px';
+      statusSpan.style.cursor = 'pointer';
+      statusSpan.style.color = '#ccc';
+
+      // При клике на статус показываем select
+      statusSpan.addEventListener('click', () => {
+        const select = document.createElement('select');
+        Object.entries(statuses).forEach(([key, label]) => {
+          const option = document.createElement('option');
+          option.value = key;
+          option.textContent = label;
+          if (key === task.status) option.selected = true;
+          select.appendChild(option);
+        });
+        statusSpan.replaceWith(select);
+
+        select.focus();
+
+        // При смене статуса обновляем в БД и возвращаем span
+        select.addEventListener('change', () => {
+          updateTaskStatus(task.id, select.value);
+          select.replaceWith(statusSpan);
+          statusSpan.textContent = statuses[select.value];
         });
 
-        input.value = "";
-      };
-
-      const tasksRef = ref(db, `users/${userId}/tasks`);
-      onValue(tasksRef, (snapshot) => {
-        list.innerHTML = "";
-        const data = snapshot.val();
-        if (data) {
-          Object.values(data).forEach(task => {
-            const li = document.createElement("li");
-
-            const leftDiv = document.createElement("div");
-            leftDiv.className = "task-left";
-
-            const checkbox = document.createElement("input");
-            checkbox.type = "checkbox";
-            checkbox.className = "checkbox";
-            checkbox.checked = task.completed;
-            checkbox.onchange = () => {
-              update(ref(db, `users/${userId}/tasks/${task.id}`), {
-                completed: checkbox.checked
-              });
-            };
-
-            const span = document.createElement("span");
-            span.className = "task-text";
-            span.textContent = task.text;
-            if (task.completed) {
-              span.style.textDecoration = "line-through";
-              span.style.color = "#888";
-            }
-
-            span.onclick = () => {
-              const input = document.createElement("input");
-              input.type = "text";
-              input.value = task.text;
-              input.className = "edit-input";
-              input.onblur = () => {
-                const newText = input.value.trim();
-                if (newText && newText !== task.text) {
-                  update(ref(db, `users/${userId}/tasks/${task.id}`), {
-                    text: newText
-                  });
-                }
-              };
-              span.replaceWith(input);
-              input.focus();
-            };
-
-            const statusSelect = document.createElement("select");
-            statusSelect.className = "status-select";
-            ["в очереди", "в работе", "выполнена"].forEach(status => {
-              const option = document.createElement("option");
-              option.value = status;
-              option.textContent = status;
-              if (task.status === status) option.selected = true;
-              statusSelect.appendChild(option);
-            });
-            statusSelect.onchange = () => {
-              update(ref(db, `users/${userId}/tasks/${task.id}`), {
-                status: statusSelect.value
-              });
-            };
-
-            leftDiv.appendChild(checkbox);
-            leftDiv.appendChild(span);
-            leftDiv.appendChild(statusSelect);
-
-            const delBtn = document.createElement("button");
-            delBtn.textContent = "🗑";
-            delBtn.className = "delete-btn";
-            delBtn.onclick = () => {
-              if (confirm("Удалить задачу?")) {
-                remove(ref(db, `users/${userId}/tasks/${task.id}`));
-              }
-            };
-
-            li.appendChild(leftDiv);
-            li.appendChild(delBtn);
-            list.appendChild(li);
-          });
-        }
+        // Если уход с select без изменения, возвращаем span
+        select.addEventListener('blur', () => {
+          select.replaceWith(statusSpan);
+        });
       });
 
-      Telegram.WebApp.expand();
-    };
-  </script>
+      taskDiv.appendChild(textSpan);
+      taskDiv.appendChild(statusSpan);
+
+      tasksContainer.appendChild(taskDiv);
+    });
+  }
+
+  // Слушаем изменения в базе и обновляем UI
+  const tasksRef = ref(db, `tasks/${userId}`);
+  onValue(tasksRef, (snapshot) => {
+    const data = snapshot.val();
+    if (data) {
+      renderTasks(data);
+    } else {
+      tasksContainer.innerHTML = '<p>Задач пока нет.</p>';
+    }
+  });
+
+  // Добавление задачи по кнопке
+  btnAdd.addEventListener('click', () => {
+    addTask(inputTask.value);
+  });
+
+  // Добавление задачи по Enter
+  inputTask.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      addTask(inputTask.value);
+    }
+  });
+
+</script>
+<style>
+  body {
+    background: #121212;
+    color: #f0f0f0;
+    font-family: sans-serif;
+    padding: 20px;
+  }
+  #inputTask {
+    width: 80%;
+    padding: 10px;
+    border-radius: 10px;
+    border: none;
+    margin-right: 10px;
+    background: #1f1f1f;
+    color: #f0f0f0;
+  }
+  #btnAdd {
+    padding: 10px 20px;
+    border-radius: 10px;
+    border: none;
+    background: #6200ee;
+    color: white;
+    cursor: pointer;
+  }
+  #btnAdd:hover {
+    background: #4500bb;
+  }
+  #tasks > div:hover {
+    background: #333;
+  }
+</style>
 </head>
 <body>
-  <div class="card">
-    <h1 id="user-info">Загрузка...</h1>
-    <input id="task-input" type="text" placeholder="Введите задачу" />
-    <button id="add-task">Добавить задачу</button>
-  </div>
-  <div class="card">
-    <h2>Ваши задачи</h2>
-    <ul id="task-list"></ul>
-  </div>
+  <h1>Ежедневник++</h1>
+  <input type="text" id="inputTask" placeholder="Новая задача..." />
+  <button id="btnAdd">Добавить задачу</button>
+  <div id="tasks" style="margin-top: 20px;"></div>
 </body>
 </html>
