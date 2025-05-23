@@ -28,7 +28,7 @@
       border: none;
       font-size: 16px;
       box-sizing: border-box;
-      background: #2a2a2a;
+      background-color: #2a2a2a;
       color: #f0f0f0;
     }
     button {
@@ -45,27 +45,47 @@
       background: #2a2a2a;
       padding: 15px;
       border-radius: 15px;
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      flex-wrap: wrap;
     }
-    .task-name {
-      font-size: 16px;
-      margin-bottom: 10px;
+    /* Выделение элементов задачи */
+    .task-item span.title {
+      border: 1.5px solid #4a90e2;
+      border-radius: 6px;
+      padding: 3px 8px;
+      background-color: rgba(74, 144, 226, 0.15);
+      font-weight: 600;
+      cursor: pointer;
+      flex-grow: 1;
+      min-width: 150px;
       word-break: break-word;
+    }
+    select.status {
+      border: 1.5px solid #50e3c2;
+      border-radius: 6px;
+      padding: 3px 8px;
+      background-color: rgba(80, 227, 194, 0.12);
+      font-weight: 500;
+      color: #e0f7f5;
+      min-width: 120px;
       cursor: pointer;
     }
-    .task-status {
-      font-size: 14px;
-      font-weight: bold;
-      padding: 5px 10px;
-      border-radius: 10px;
-      display: inline-block;
-      margin-top: 10px;
+    input.date {
+      border: 1.5px solid #f5a623;
+      border-radius: 6px;
+      padding: 3px 8px;
+      background-color: rgba(245, 166, 35, 0.12);
+      font-weight: 500;
+      color: #ffe8b3;
+      min-width: 140px;
+      cursor: pointer;
     }
-    .status-В\ очереди { background-color: #2c2c2c; color: #bbbbbb; }
-    .status-В\ работе { background-color: #394040; color: #dddddd; }
-    .status-Выполнена { background-color: #335533; color: #c0ffc0; }
-
     .task-actions {
-      margin-top: 10px;
+      margin-left: auto;
+      display: flex;
+      gap: 10px;
     }
     .edit-btn, .delete-btn {
       background-color: #333;
@@ -74,75 +94,16 @@
       border-radius: 8px;
       padding: 6px 12px;
       font-size: 14px;
-      margin-right: 10px;
       cursor: pointer;
+      flex-shrink: 0;
     }
     .delete-btn {
       background-color: #d32f2f;
     }
-
-    /* Модальное окно */
-    .modal-bg {
-      position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0,0,0,0.7);
-      display: none;
-      justify-content: center;
-      align-items: center;
-      z-index: 1000;
-    }
-    .modal {
-      background: #1f1f1f;
-      padding: 20px;
-      border-radius: 20px;
-      width: 90%;
-      max-width: 400px;
-      box-shadow: 0 0 15px rgba(0,0,0,0.8);
-    }
-    .modal h2 {
-      margin-top: 0;
-      color: #4CAF50;
-    }
-    .modal label {
-      display: block;
-      margin-top: 15px;
-      font-weight: 600;
-    }
-    .modal input, .modal select {
-      width: 100%;
-      margin-top: 5px;
-      background: #2a2a2a;
-      border: none;
-      border-radius: 10px;
-      padding: 10px;
-      color: #f0f0f0;
-      font-size: 16px;
-      box-sizing: border-box;
-    }
-    .modal-buttons {
-      margin-top: 20px;
-      text-align: right;
-    }
-    .modal-buttons button {
-      width: auto;
-      padding: 10px 20px;
-      margin-left: 10px;
-      border-radius: 10px;
-      font-weight: 600;
-      font-size: 16px;
-    }
-    .btn-cancel {
-      background: #777;
-      color: #eee;
-      cursor: pointer;
-      border: none;
-    }
-    .btn-save {
-      background-color: #4CAF50;
-      color: white;
-      cursor: pointer;
-      border: none;
-    }
+    /* Статусы для селекта */
+    .status-В\ очереди { background-color: #2c2c2c; color: #bbbbbb; }
+    .status-В\ работе { background-color: #394040; color: #dddddd; }
+    .status-Выполнена { background-color: #335533; color: #c0ffc0; }
   </style>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-app.js";
@@ -172,59 +133,29 @@
 
       if (!userId) return;
 
+      const input = document.getElementById("task-input");
+      const addBtn = document.getElementById("add-task");
       const list = document.getElementById("task-list");
       const statusFilter = document.getElementById("status-filter");
-      const dateFrom = document.getElementById("date-from");
-      const dateTo = document.getElementById("date-to");
+      const dateFilter = document.getElementById("date-filter");
 
       let tasks = [];
 
-      // Модальное окно элементы
-      const modalBg = document.getElementById("modal-bg");
-      const modal = document.getElementById("modal");
-      const addTaskBtn = document.getElementById("add-task");
-      const modalInput = document.getElementById("modal-task-input");
-      const modalStatus = document.getElementById("modal-task-status");
-      const modalDate = document.getElementById("modal-task-date");
-      const saveBtn = document.getElementById("modal-save-btn");
-      const cancelBtn = document.getElementById("modal-cancel-btn");
-
-      // Открыть модалку
-      addTaskBtn.onclick = () => {
-        modalInput.value = "";
-        modalStatus.value = "В очереди";
-        modalDate.value = "";
-        modalBg.style.display = "flex";
-      };
-
-      // Закрыть модалку
-      cancelBtn.onclick = () => {
-        modalBg.style.display = "none";
-      };
-
-      // Сохранить задачу
-      saveBtn.onclick = async () => {
-        const text = modalInput.value.trim();
-        const status = modalStatus.value;
-        const date = modalDate.value;
-
-        if (!text) {
-          alert("Введите название задачи");
-          return;
-        }
+      addBtn.onclick = async () => {
+        const text = input.value.trim();
+        if (!text) return;
 
         const taskRef = push(ref(db, `users/${userId}/tasks`));
         await set(taskRef, {
           id: taskRef.key,
           text,
-          status,
-          date: date || null
+          status: "В очереди",
+          date: null
         });
 
-        modalBg.style.display = "none";
+        input.value = "";
       };
 
-      // Загрузка задач и слушатель обновлений
       const tasksRef = ref(db, `users/${userId}/tasks`);
       onValue(tasksRef, (snapshot) => {
         const data = snapshot.val();
@@ -233,42 +164,31 @@
       });
 
       statusFilter.onchange = renderTasks;
-      dateFrom.onchange = renderTasks;
-      dateTo.onchange = renderTasks;
+      dateFilter.onchange = renderTasks;
 
       function renderTasks() {
         list.innerHTML = "";
         const selectedStatus = statusFilter.value;
-        const fromDate = dateFrom.value ? new Date(dateFrom.value) : null;
-        const toDate = dateTo.value ? new Date(dateTo.value) : null;
+        const selectedDate = dateFilter.value;
 
-        // Фильтрация и сортировка
         let filtered = tasks;
 
         if (selectedStatus) {
           filtered = filtered.filter(t => t.status === selectedStatus);
         }
-        if (fromDate) {
-          filtered = filtered.filter(t => t.date && new Date(t.date) >= fromDate);
-        }
-        if (toDate) {
-          filtered = filtered.filter(t => t.date && new Date(t.date) <= toDate);
-        }
 
-        filtered.sort((a, b) => {
-          if (!a.date) return 1;
-          if (!b.date) return -1;
-          return new Date(a.date) - new Date(b.date);
-        });
+        if (selectedDate) {
+          filtered = filtered.filter(t => t.date === selectedDate);
+        }
 
         filtered.forEach(task => {
           const li = document.createElement("li");
+          li.className = "task-item";
 
-          const title = document.createElement("div");
-          title.className = "task-name";
+          const title = document.createElement("span");
+          title.className = "title";
           title.textContent = task.text;
           title.onclick = async () => {
-            // Редактируем название задачи
             const newText = prompt("Редактировать задачу:", task.text);
             if (newText) {
               await update(ref(db, `users/${userId}/tasks/${task.id}`), { text: newText });
@@ -276,6 +196,7 @@
           };
 
           const status = document.createElement("select");
+          status.className = "status";
           ["В очереди", "В работе", "Выполнена"].forEach(s => {
             const option = document.createElement("option");
             option.value = s;
@@ -285,31 +206,34 @@
           });
           status.onchange = async () => {
             await update(ref(db, `users/${userId}/tasks/${task.id}`), { status: status.value });
-            renderTasks();
           };
-          status.className = `task-status status-${task.status.replace(" ", "\\ ")}`;
 
-          const date = document.createElement("input");
-          date.type = "date";
-          date.value = task.date || "";
-          date.onchange = async () => {
-            await update(ref(db, `users/${userId}/tasks/${task.id}`), { date: date.value });
-            renderTasks();
+          const dateInput = document.createElement("input");
+          dateInput.type = "date";
+          dateInput.className = "date";
+          dateInput.value = task.date || "";
+          dateInput.onchange = async () => {
+            await update(ref(db, `users/${userId}/tasks/${task.id}`), { date: dateInput.value });
           };
+
+          const actions = document.createElement("div");
+          actions.className = "task-actions";
 
           const delBtn = document.createElement("button");
           delBtn.textContent = "Удалить";
           delBtn.className = "delete-btn";
-          delBtn.onclick = async () => {
-            if (confirm("Удалить эту задачу?")) {
-              await remove(ref(db, `users/${userId}/tasks/${task.id}`));
+          delBtn.onclick = () => {
+            if (confirm("Удалить задачу?")) {
+              remove(ref(db, `users/${userId}/tasks/${task.id}`));
             }
           };
 
+          actions.appendChild(delBtn);
+
           li.appendChild(title);
           li.appendChild(status);
-          li.appendChild(date);
-          li.appendChild(delBtn);
+          li.appendChild(dateInput);
+          li.appendChild(actions);
 
           list.appendChild(li);
         });
@@ -318,51 +242,22 @@
   </script>
 </head>
 <body>
-  <div id="user-info" style="margin-bottom: 10px; font-weight: bold;"></div>
-
   <div class="card">
-    <button id="add-task">➕ Добавить задачу</button>
-  </div>
-
-  <div class="card">
-    <label for="status-filter">Фильтр по статусу:</label>
-    <select id="status-filter">
-      <option value="">Все</option>
-      <option value="В очереди">В очереди</option>
-      <option value="В работе">В работе</option>
-      <option value="Выполнена">Выполнена</option>
-    </select>
-
-    <label for="date-from" style="margin-top: 15px;">Дата с:</label>
-    <input type="date" id="date-from" />
-    <label for="date-to" style="margin-top: 15px;">Дата по:</label>
-    <input type="date" id="date-to" />
-  </div>
-
-  <ul id="task-list"></ul>
-
-  <!-- Модальное окно -->
-  <div class="modal-bg" id="modal-bg">
-    <div class="modal" id="modal">
-      <h2>Новая задача</h2>
-      <label for="modal-task-input">Название задачи:</label>
-      <input type="text" id="modal-task-input" placeholder="Например: купить пиццу" />
-
-      <label for="modal-task-status">Статус:</label>
-      <select id="modal-task-status">
+    <div id="user-info" style="font-weight:600; margin-bottom: 10px;">Загрузка...</div>
+    <input type="text" id="task-input" placeholder="Новая задача..." />
+    <button id="add-task">Добавить задачу</button>
+    <div style="margin-top: 15px;">
+      <label for="status-filter">Фильтр по статусу:</label>
+      <select id="status-filter">
+        <option value="">Все</option>
         <option value="В очереди">В очереди</option>
         <option value="В работе">В работе</option>
         <option value="Выполнена">Выполнена</option>
       </select>
-
-      <label for="modal-task-date">Дата выполнения:</label>
-      <input type="date" id="modal-task-date" />
-
-      <div class="modal-buttons">
-        <button class="btn-cancel" id="modal-cancel-btn">Отмена</button>
-        <button class="btn-save" id="modal-save-btn">Сохранить</button>
-      </div>
+      <label for="date-filter" style="margin-left:15px;">Фильтр по дате:</label>
+      <input type="date" id="date-filter" />
     </div>
   </div>
+  <ul id="task-list"></ul>
 </body>
 </html>
