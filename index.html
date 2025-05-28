@@ -74,6 +74,20 @@
       cursor: pointer;
       background: #555;
       color: #ddd;
+      margin-right: 8px;
+    }
+    .task-priority {
+      font-size: 13px;
+      font-weight: bold;
+      padding: 4px 8px;
+      border-radius: 10px;
+      display: inline-block;
+      margin-top: 10px;
+      user-select: none;
+      transition: background-color 0.3s ease, color 0.3s ease;
+      border: none;
+      cursor: default;
+      color: #eee;
     }
     /* Цвета статусов */
     .status-В\ очереди {
@@ -86,6 +100,23 @@
     }
     .status-Выполнена {
       background-color: #4caf50;
+      color: #fff;
+    }
+    /* Цвета приоритетов */
+    .priority-Важно\ +\ Срочно {
+      background-color: #e53935;
+      color: #fff;
+    }
+    .priority-Важно\ +\ Не\ срочно {
+      background-color: #f57c00;
+      color: #fff;
+    }
+    .priority-Не\ важно\ +\ Срочно {
+      background-color: #1e88e5;
+      color: #fff;
+    }
+    .priority-Не\ важно\ +\ Не\ срочно {
+      background-color: #757575;
       color: #fff;
     }
     .task-actions {
@@ -180,11 +211,20 @@
     .btn-save:hover {
       background-color: #45a049;
     }
-    #status-filter {
+    #status-filter, #priority-filter {
       margin-top: 15px;
       background: #333;
       color: #eee;
       border-radius: 10px;
+    }
+    #filters-container {
+      display: flex;
+      gap: 15px;
+      margin-bottom: 15px;
+      flex-wrap: wrap;
+    }
+    #filters-container select {
+      flex: 1 1 150px;
     }
   </style>
   <script type="module">
@@ -217,34 +257,105 @@
 
       const list = document.getElementById("task-list");
       const statusFilter = document.getElementById("status-filter");
+      const priorityFilter = document.getElementById("priority-filter");
       const openModalBtn = document.getElementById("add-task");
       const modalOverlay = document.getElementById("modal-overlay");
       const modalTitle = document.getElementById("modal-title");
       const taskNameInput = document.getElementById("modal-task-name");
       const taskStatusSelect = document.getElementById("modal-task-status");
+      const taskPrioritySelect = document.getElementById("modal-task-priority");
       const taskDateInput = document.getElementById("modal-task-date");
-      const btnSave = document.getElementById("modal-save");
-      const btnCancel = document.getElementById("modal-cancel");
+      const saveBtn = document.getElementById("modal-save");
+      const cancelBtn = document.getElementById("modal-cancel");
 
-      let tasks = [];
+      let tasks = {};
       let editingTaskId = null;
 
-      openModalBtn.onclick = () => {
+      function renderTasks() {
+        list.innerHTML = "";
+
+        const statusValue = statusFilter.value;
+        const priorityValue = priorityFilter.value;
+
+        for (const [id, task] of Object.entries(tasks)) {
+          if (statusValue !== "Все" && task.status !== statusValue) continue;
+          if (priorityValue !== "Все" && task.priority !== priorityValue) continue;
+
+          const li = document.createElement("li");
+
+          const taskNameDiv = document.createElement("div");
+          taskNameDiv.textContent = task.name;
+          taskNameDiv.className = "task-name";
+          taskNameDiv.title = "Нажмите для редактирования";
+          taskNameDiv.onclick = () => openEditModal(id);
+
+          const taskDateDiv = document.createElement("div");
+          taskDateDiv.className = "task-date";
+          taskDateDiv.textContent = task.date ? `Дата: ${task.date}` : "";
+
+          const statusSpan = document.createElement("span");
+          statusSpan.textContent = task.status;
+          statusSpan.className = `task-status status-${task.status.replace(/\s/g, '\\ ')}`;
+
+          const prioritySpan = document.createElement("span");
+          prioritySpan.textContent = task.priority;
+          prioritySpan.className = `task-priority priority-${task.priority.replace(/\s/g, '\\ ')}`;
+
+          const actionsDiv = document.createElement("div");
+          actionsDiv.className = "task-actions";
+
+          const editBtn = document.createElement("button");
+          editBtn.textContent = "✏️";
+          editBtn.className = "edit-btn";
+          editBtn.onclick = () => openEditModal(id);
+
+          const deleteBtn = document.createElement("button");
+          deleteBtn.textContent = "🗑️";
+          deleteBtn.className = "delete-btn";
+          deleteBtn.onclick = () => deleteTask(id);
+
+          actionsDiv.appendChild(editBtn);
+          actionsDiv.appendChild(deleteBtn);
+
+          li.appendChild(taskNameDiv);
+          li.appendChild(taskDateDiv);
+          li.appendChild(statusSpan);
+          li.appendChild(prioritySpan);
+          li.appendChild(actionsDiv);
+
+          list.appendChild(li);
+        }
+      }
+
+      function openEditModal(id) {
+        editingTaskId = id;
+        const task = tasks[id];
+        modalTitle.textContent = "Редактировать задачу";
+        taskNameInput.value = task.name;
+        taskStatusSelect.value = task.status;
+        taskPrioritySelect.value = task.priority;
+        taskDateInput.value = task.date || "";
+        modalOverlay.style.display = "flex";
+      }
+
+      function openNewModal() {
         editingTaskId = null;
         modalTitle.textContent = "Создать задачу";
         taskNameInput.value = "";
         taskStatusSelect.value = "В очереди";
+        taskPrioritySelect.value = "Не важно + Не срочно";
         taskDateInput.value = "";
         modalOverlay.style.display = "flex";
-      };
+      }
 
-      btnCancel.onclick = () => {
+      function closeModal() {
         modalOverlay.style.display = "none";
-      };
+      }
 
-      btnSave.onclick = async () => {
+      function saveTask() {
         const name = taskNameInput.value.trim();
         const status = taskStatusSelect.value;
+        const priority = taskPrioritySelect.value;
         const date = taskDateInput.value;
 
         if (!name) {
@@ -253,146 +364,102 @@
         }
 
         if (editingTaskId) {
-          await update(ref(db, `users/${userId}/tasks/${editingTaskId}`), {
-            text: name,
-            status: status,
-            date: date || null
+          // обновляем
+          update(ref(db, `tasks/${userId}/${editingTaskId}`), {
+            name,
+            status,
+            priority,
+            date
           });
         } else {
-          const taskRef = push(ref(db, `users/${userId}/tasks`));
-          await set(taskRef, {
-            text: name,
-            status: status,
-            date: date || null
+          // создаём
+          const newTaskRef = push(ref(db, `tasks/${userId}`));
+          set(newTaskRef, {
+            name,
+            status,
+            priority,
+            date
           });
         }
-        modalOverlay.style.display = "none";
-      };
-
-      function renderTasks(filterStatus) {
-        list.innerHTML = "";
-
-        const filtered = filterStatus === "Все" ? tasks : tasks.filter(t => t.status === filterStatus);
-
-        if (filtered.length === 0) {
-          const empty = document.createElement("p");
-          empty.textContent = "Задач пока нет.";
-          empty.style.color = "#888";
-          list.appendChild(empty);
-          return;
-        }
-
-        filtered.forEach(task => {
-          const li = document.createElement("li");
-
-          const nameDiv = document.createElement("div");
-          nameDiv.textContent = task.text;
-          nameDiv.className = "task-name";
-          nameDiv.title = "Кликните для редактирования";
-          nameDiv.onclick = () => openEditModal(task);
-          li.appendChild(nameDiv);
-
-          if (task.date) {
-            const dateDiv = document.createElement("div");
-            dateDiv.textContent = `Дата: ${task.date}`;
-            dateDiv.className = "task-date";
-            li.appendChild(dateDiv);
-          }
-
-          const statusBtn = document.createElement("button");
-          statusBtn.textContent = task.status;
-          statusBtn.className = `task-status status-${task.status.replace(/\s/g, '\\ ')}`;
-          statusBtn.title = "Статус задачи";
-          li.appendChild(statusBtn);
-
-          const actionsDiv = document.createElement("div");
-          actionsDiv.className = "task-actions";
-
-          const editBtn = document.createElement("button");
-          editBtn.textContent = "Редактировать";
-          editBtn.className = "edit-btn";
-          editBtn.onclick = () => openEditModal(task);
-          actionsDiv.appendChild(editBtn);
-
-          const deleteBtn = document.createElement("button");
-          deleteBtn.textContent = "Удалить";
-          deleteBtn.className = "delete-btn";
-          deleteBtn.onclick = () => deleteTask(task.id);
-          actionsDiv.appendChild(deleteBtn);
-
-          li.appendChild(actionsDiv);
-
-          list.appendChild(li);
-        });
+        closeModal();
       }
 
-      function openEditModal(task) {
-        editingTaskId = task.id;
-        modalTitle.textContent = "Редактировать задачу";
-        taskNameInput.value = task.text;
-        taskStatusSelect.value = task.status;
-        taskDateInput.value = task.date || "";
-        modalOverlay.style.display = "flex";
-      }
-
-      async function deleteTask(id) {
-        if (confirm("Точно удалить задачу?")) {
-          await remove(ref(db, `users/${userId}/tasks/${id}`));
+      function deleteTask(id) {
+        if (confirm("Удалить задачу?")) {
+          remove(ref(db, `tasks/${userId}/${id}`));
         }
       }
 
-      statusFilter.onchange = () => {
-        renderTasks(statusFilter.value);
-      };
-
-      // Подписка на изменения в БД
-      onValue(ref(db, `users/${userId}/tasks`), snapshot => {
-        const data = snapshot.val() || {};
-        tasks = Object.entries(data).map(([id, val]) => ({
-          id,
-          text: val.text,
-          status: val.status,
-          date: val.date || null,
-        }));
-        renderTasks(statusFilter.value);
+      // Слушатель Firebase
+      onValue(ref(db, `tasks/${userId}`), (snapshot) => {
+        tasks = snapshot.val() || {};
+        renderTasks();
       });
+
+      // События
+      openModalBtn.onclick = openNewModal;
+      cancelBtn.onclick = closeModal;
+      saveBtn.onclick = saveTask;
+      statusFilter.onchange = renderTasks;
+      priorityFilter.onchange = renderTasks;
+
+      // Telegram Web App адаптация
+      if (window.Telegram.WebApp) {
+        window.Telegram.WebApp.expand();
+      }
     };
   </script>
 </head>
 <body>
-  <div class="card" id="user-info">Привет!</div>
-
   <div class="card">
+    <div id="user-info" style="font-weight:bold; font-size:18px; margin-bottom:10px;"></div>
+    <div id="filters-container">
+      <select id="status-filter" title="Фильтр по статусу">
+        <option>Все</option>
+        <option>В очереди</option>
+        <option>В работе</option>
+        <option>Выполнена</option>
+      </select>
+      <select id="priority-filter" title="Фильтр по приоритету">
+        <option>Все</option>
+        <option>Важно + Срочно</option>
+        <option>Важно + Не срочно</option>
+        <option>Не важно + Срочно</option>
+        <option>Не важно + Не срочно</option>
+      </select>
+    </div>
     <button id="add-task">➕ Создать задачу</button>
-    <select id="status-filter" title="Фильтр задач по статусу">
-      <option>Все</option>
-      <option>В очереди</option>
-      <option>В работе</option>
-      <option>Выполнена</option>
-    </select>
   </div>
 
   <ul id="task-list"></ul>
 
-  <div class="modal-overlay" id="modal-overlay">
-    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+  <div id="modal-overlay" class="modal-overlay">
+    <div class="modal">
       <h3 id="modal-title">Создать задачу</h3>
-      <label for="modal-task-name">Название задачи:</label>
-      <input id="modal-task-name" type="text" placeholder="Например, 'Подготовить отчёт'" />
-
-      <label for="modal-task-status">Статус:</label>
+      <label for="modal-task-name">Название задачи</label>
+      <input type="text" id="modal-task-name" placeholder="Введите название..." />
+      
+      <label for="modal-task-status">Статус</label>
       <select id="modal-task-status">
         <option>В очереди</option>
         <option>В работе</option>
         <option>Выполнена</option>
       </select>
+      
+      <label for="modal-task-priority">Приоритет</label>
+      <select id="modal-task-priority">
+        <option>Важно + Срочно</option>
+        <option>Важно + Не срочно</option>
+        <option>Не важно + Срочно</option>
+        <option>Не важно + Не срочно</option>
+      </select>
 
-      <label for="modal-task-date">Дата выполнения (опционально):</label>
-      <input id="modal-task-date" type="date" />
+      <label for="modal-task-date">Дата выполнения</label>
+      <input type="date" id="modal-task-date" />
 
       <div class="modal-buttons">
-        <button class="btn-cancel" id="modal-cancel">Отмена</button>
-        <button class="btn-save" id="modal-save">Сохранить</button>
+        <button id="modal-cancel" class="btn-cancel">Отмена</button>
+        <button id="modal-save" class="btn-save">Сохранить</button>
       </div>
     </div>
   </div>
