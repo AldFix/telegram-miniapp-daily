@@ -6,21 +6,175 @@
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <title>Ежедневник++</title>
   <style>
+    body {
+      margin: 0;
+      font-family: sans-serif;
+      background-color: #121212;
+      color: #f0f0f0;
+      padding: 20px;
+    }
+    .card {
+      background: #1f1f1f;
+      padding: 20px;
+      border-radius: 20px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+      margin-bottom: 20px;
+    }
+    input, select, button {
+      padding: 10px;
+      margin-top: 10px;
+      width: 100%;
+      border-radius: 10px;
+      border: none;
+      font-size: 16px;
+      box-sizing: border-box;
+    }
+    button {
+      background-color: #4CAF50;
+      color: white;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+    button:hover {
+      background-color: #45a049;
+    }
+    ul {
+      padding-left: 0;
+      list-style-type: none;
+    }
+    li {
+      margin-bottom: 15px;
+      background: #2a2a2a;
+      padding: 15px;
+      border-radius: 15px;
+    }
+    .task-name {
+      font-size: 16px;
+      margin-bottom: 5px;
+      word-break: break-word;
+      cursor: pointer;
+    }
+    .task-date {
+      font-size: 12px;
+      color: #999999;
+      margin-bottom: 8px;
+    }
+    .task-status {
+      font-size: 14px;
+      font-weight: bold;
+      padding: 5px 10px;
+      border-radius: 10px;
+      display: inline-block;
+      margin-top: 10px;
+      user-select: none;
+      transition: background-color 0.3s ease, color 0.3s ease;
+      border: none;
+      cursor: pointer;
+    }
+    /* Цвета статусов */
     .status-В\ очереди {
-      background-color: #c0c0c0;
+      background-color: #555555;
+      color: #ddd;
     }
     .status-В\ работе {
-      background-color: #fdd835;
+      background-color: #ff9800;
+      color: #fff;
     }
     .status-Выполнена {
-      background-color: #66bb6a;
-    }
-    select.task-status {
-      border: none;
-      border-radius: 5px;
-      padding: 5px;
-      font-weight: bold;
+      background-color: #4caf50;
       color: #fff;
+    }
+    .task-actions {
+      margin-top: 10px;
+    }
+    .edit-btn, .delete-btn {
+      background-color: #333;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-size: 14px;
+      margin-right: 10px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+    .edit-btn:hover {
+      background-color: #555;
+    }
+    .delete-btn {
+      background-color: #d32f2f;
+    }
+    .delete-btn:hover {
+      background-color: #b71c1c;
+    }
+    /* Модальное окно */
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.7);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    .modal {
+      background: #1f1f1f;
+      padding: 20px;
+      border-radius: 20px;
+      width: 320px;
+      box-shadow: 0 0 15px rgba(0,0,0,0.8);
+      box-sizing: border-box;
+    }
+    .modal h3 {
+      margin-top: 0;
+      color: #ccc;
+    }
+    .modal label {
+      display: block;
+      margin-top: 10px;
+      font-size: 14px;
+      color: #bbb;
+    }
+    .modal input[type="text"],
+    .modal select,
+    .modal input[type="date"] {
+      width: 100%;
+      padding: 8px;
+      margin-top: 5px;
+      border-radius: 8px;
+      border: none;
+      font-size: 16px;
+      box-sizing: border-box;
+      background: #333;
+      color: #eee;
+    }
+    .modal-buttons {
+      margin-top: 20px;
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+    .modal-buttons button {
+      width: auto;
+      padding: 8px 16px;
+      font-size: 15px;
+      border-radius: 10px;
+      border: none;
+      cursor: pointer;
+    }
+    .btn-cancel {
+      background: #555;
+      color: #eee;
+    }
+    .btn-cancel:hover {
+      background: #777;
+    }
+    .btn-save {
+      background-color: #4CAF50;
+      color: white;
+    }
+    .btn-save:hover {
+      background-color: #45a049;
     }
   </style>
   <script type="module">
@@ -97,140 +251,155 @@
         } else {
           const taskRef = push(ref(db, `users/${userId}/tasks`));
           await set(taskRef, {
-            id: taskRef.key,
             text: name,
             status: status,
             date: date || null
           });
         }
-
         modalOverlay.style.display = "none";
       };
 
-      const tasksRef = ref(db, `users/${userId}/tasks`);
-      onValue(tasksRef, (snapshot) => {
-        const data = snapshot.val();
-        tasks = data ? Object.values(data) : [];
-        renderTasks();
-      });
-
-      statusFilter.onchange = renderTasks;
-
-      function renderTasks() {
+      function renderTasks(filterStatus) {
         list.innerHTML = "";
-        const selectedStatus = statusFilter.value;
-        const sorted = tasks.slice().sort((a, b) => {
-          if (!a.date && !b.date) return 0;
-          if (!a.date) return 1;
-          if (!b.date) return -1;
-          return new Date(a.date) - new Date(b.date);
-        });
 
-        const filtered = selectedStatus
-          ? sorted.filter(t => t.status === selectedStatus)
-          : sorted;
+        const filtered = filterStatus === "Все" ? tasks : tasks.filter(t => t.status === filterStatus);
+
+        if (filtered.length === 0) {
+          const empty = document.createElement("p");
+          empty.textContent = "Нет задач для отображения.";
+          empty.style.color = "#999";
+          list.appendChild(empty);
+          return;
+        }
 
         filtered.forEach(task => {
           const li = document.createElement("li");
 
-          const title = document.createElement("div");
-          title.className = "task-name";
-          title.textContent = task.text;
-          title.onclick = () => openEditModal(task);
+          // Название задачи с кликом для редактирования
+          const nameSpan = document.createElement("span");
+          nameSpan.textContent = task.text;
+          nameSpan.className = "task-name";
+          nameSpan.title = "Кликните, чтобы редактировать";
+          nameSpan.onclick = () => {
+            editingTaskId = task.id;
+            modalTitle.textContent = "Редактировать задачу";
+            taskNameInput.value = task.text;
+            taskStatusSelect.value = task.status;
+            taskDateInput.value = task.date || "";
+            modalOverlay.style.display = "flex";
+          };
+          li.appendChild(nameSpan);
 
-          const dateDiv = document.createElement("div");
-          dateDiv.className = "task-date";
-          dateDiv.textContent = task.date ? `Срок: ${task.date}` : "";
+          // Дата задачи
+          if (task.date) {
+            const dateP = document.createElement("p");
+            dateP.className = "task-date";
+            dateP.textContent = `Дата выполнения: ${task.date}`;
+            li.appendChild(dateP);
+          }
 
-          const status = document.createElement("select");
+          // Статус с цветом и возможностью смены
+          const statusSelect = document.createElement("select");
+          statusSelect.className = "task-status";
           ["В очереди", "В работе", "Выполнена"].forEach(s => {
             const option = document.createElement("option");
             option.value = s;
             option.textContent = s;
-            if (task.status === s) option.selected = true;
-            status.appendChild(option);
+            statusSelect.appendChild(option);
           });
-          status.className = `task-status status-${task.status.replace(/ /g, "\\ ")}`;
-          status.onchange = () => {
-            update(ref(db, `users/${userId}/tasks/${task.id}`), {
-              status: status.value
+          statusSelect.value = task.status;
+
+          // Устанавливаем класс для цвета
+          function updateStatusClass(elem, status) {
+            elem.classList.remove("status-В очереди", "status-В работе", "status-Выполнена");
+            elem.classList.add(`status-${status.replace(/\s/g, "\\ ")}`);
+          }
+          updateStatusClass(statusSelect, task.status);
+
+          statusSelect.onchange = async (e) => {
+            const newStatus = e.target.value;
+            updateStatusClass(statusSelect, newStatus);
+            await update(ref(db, `users/${userId}/tasks/${task.id}`), {
+              status: newStatus
             });
+            // Обновим локальные данные и отрендерим заново
+            const idx = tasks.findIndex(t => t.id === task.id);
+            if (idx !== -1) {
+              tasks[idx].status = newStatus;
+            }
+            renderTasks(statusFilter.value);
           };
+          li.appendChild(statusSelect);
 
-          const actions = document.createElement("div");
-          actions.className = "task-actions";
-
-          const editBtn = document.createElement("button");
-          editBtn.className = "edit-btn";
-          editBtn.textContent = "✏️";
-          editBtn.onclick = () => openEditModal(task);
-
-          const deleteBtn = document.createElement("button");
-          deleteBtn.className = "delete-btn";
-          deleteBtn.textContent = "🗑";
-          deleteBtn.onclick = async () => {
-            if (confirm("Удалить задачу?")) {
+          // Кнопка удаления
+          const actionsDiv = document.createElement("div");
+          actionsDiv.className = "task-actions";
+          const delBtn = document.createElement("button");
+          delBtn.className = "delete-btn";
+          delBtn.textContent = "Удалить";
+          delBtn.onclick = async () => {
+            if (confirm(`Удалить задачу "${task.text}"?`)) {
               await remove(ref(db, `users/${userId}/tasks/${task.id}`));
             }
           };
-
-          actions.appendChild(editBtn);
-          actions.appendChild(deleteBtn);
-
-          li.appendChild(title);
-          li.appendChild(dateDiv);
-          li.appendChild(status);
-          li.appendChild(actions);
+          actionsDiv.appendChild(delBtn);
+          li.appendChild(actionsDiv);
 
           list.appendChild(li);
         });
       }
 
-      function openEditModal(task) {
-        editingTaskId = task.id;
-        modalTitle.textContent = "Редактировать задачу";
-        taskNameInput.value = task.text;
-        taskStatusSelect.value = task.status;
-        taskDateInput.value = task.date || "";
-        modalOverlay.style.display = "flex";
-      }
+      // Фильтр по статусу
+      statusFilter.onchange = () => {
+        renderTasks(statusFilter.value);
+      };
+
+      // Подписка на задачи из Firebase
+      onValue(ref(db, `users/${userId}/tasks`), (snapshot) => {
+        const data = snapshot.val();
+        tasks = [];
+        for (const id in data) {
+          tasks.push({ id, ...data[id] });
+        }
+        renderTasks(statusFilter.value);
+      });
     };
   </script>
 </head>
 <body>
+  <h1 id="user-info">Загрузка...</h1>
+
   <div class="card">
-    <div id="user-info">Загрузка...</div>
-    <div style="margin-top: 20px">
-      <select id="status-filter">
-        <option value="">Все</option>
-        <option value="В очереди">В очереди</option>
-        <option value="В работе">В работе</option>
-        <option value="Выполнена">Выполнена</option>
-      </select>
-      <button id="add-task">➕ Создать задачу</button>
-    </div>
+    <button id="add-task">➕ Создать задачу</button>
+    <br />
+    <label for="status-filter">Фильтр по статусу:</label>
+    <select id="status-filter">
+      <option>Все</option>
+      <option>В очереди</option>
+      <option>В работе</option>
+      <option>Выполнена</option>
+    </select>
   </div>
+
   <ul id="task-list"></ul>
 
-  <div class="modal-overlay" id="modal-overlay">
+  <!-- Модальное окно создания/редактирования задачи -->
+  <div id="modal-overlay" class="modal-overlay">
     <div class="modal">
-      <h3 id="modal-title">Задача</h3>
-      <label for="modal-task-name">Название</label>
+      <h3 id="modal-title">Создать задачу</h3>
+      <label for="modal-task-name">Название задачи:</label>
       <input type="text" id="modal-task-name" />
-
-      <label for="modal-task-status">Статус</label>
+      <label for="modal-task-status">Статус задачи:</label>
       <select id="modal-task-status">
-        <option value="В очереди">В очереди</option>
-        <option value="В работе">В работе</option>
-        <option value="Выполнена">Выполнена</option>
+        <option>В очереди</option>
+        <option>В работе</option>
+        <option>Выполнена</option>
       </select>
-
-      <label for="modal-task-date">Дата</label>
+      <label for="modal-task-date">Дата выполнения:</label>
       <input type="date" id="modal-task-date" />
-
       <div class="modal-buttons">
-        <button class="btn-cancel" id="modal-cancel">Отмена</button>
-        <button class="btn-save" id="modal-save">Сохранить</button>
+        <button id="modal-cancel" class="btn-cancel">Отмена</button>
+        <button id="modal-save" class="btn-save">Сохранить</button>
       </div>
     </div>
   </div>
