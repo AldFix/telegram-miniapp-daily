@@ -272,223 +272,164 @@
       const modalOverlay = document.getElementById("modal-overlay");
       const modalTitle = document.getElementById("modal-title");
       const taskNameInput = document.getElementById("task-name");
-      const taskDateInput = document.getElementById("task-date");
       const taskStatusSelect = document.getElementById("task-status");
       const taskPrioritySelect = document.getElementById("task-priority");
+      const taskDateInput = document.getElementById("task-date");
       const saveBtn = document.getElementById("save-task");
       const cancelBtn = document.getElementById("cancel-task");
 
-      let editingTaskKey = null;
       let tasks = {};
+      let editTaskKey = null;
 
-      // Подгрузка задач из Firebase
-      function loadTasks() {
-        const userTasksRef = ref(db, `users/${userId}/tasks`);
-        onValue(userTasksRef, (snapshot) => {
-          tasks = snapshot.val() || {};
-          renderTasks();
-        });
-      }
+      // Загрузка задач
+      const tasksRef = ref(db, 'users/' + userId + '/tasks');
+      onValue(tasksRef, (snapshot) => {
+        tasks = snapshot.val() || {};
+        renderTasks();
+      });
 
-      // Сохранить или обновить задачу
-      function saveTask() {
-        const name = taskNameInput.value.trim();
-        const date = taskDateInput.value;
-        const status = taskStatusSelect.value;
-        const priority = taskPrioritySelect.value;
-
-        if (!name) {
-          alert("Название задачи не может быть пустым.");
-          return;
-        }
-        if (!date) {
-          alert("Пожалуйста, выберите дату.");
-          return;
-        }
-
-        if (editingTaskKey) {
-          // Обновляем существующую задачу
-          update(ref(db, `users/${userId}/tasks/${editingTaskKey}`), {
-            name, date, status, priority
-          });
-        } else {
-          // Добавляем новую задачу
-          const newTaskRef = push(ref(db, `users/${userId}/tasks`));
-          set(newTaskRef, { name, date, status, priority });
-        }
-
-        closeModal();
-      }
-
-      // Удалить задачу
-      function deleteTask(key) {
-        if (confirm("Удалить задачу?")) {
-          remove(ref(db, `users/${userId}/tasks/${key}`));
-        }
-      }
-
-      // Открыть модальное окно для новой задачи
-      function openModalForNewTask() {
-        editingTaskKey = null;
-        modalTitle.textContent = "Создать задачу";
-        taskNameInput.value = "";
-        taskDateInput.valueAsDate = new Date();
-        taskStatusSelect.value = "В очереди";
-        taskPrioritySelect.value = "Не важно + Не срочно";
-        modalOverlay.style.display = "flex";
-        taskNameInput.focus();
-      }
-
-      // Открыть модальное окно для редактирования задачи
-      function openModalForEditTask(key) {
-        const task = tasks[key];
-        if (!task) return;
-
-        editingTaskKey = key;
-        modalTitle.textContent = "Редактировать задачу";
-        taskNameInput.value = task.name;
-        taskDateInput.value = task.date;
-        taskStatusSelect.value = task.status || "В очереди";
-        taskPrioritySelect.value = task.priority || "Не важно + Не срочно";
-        modalOverlay.style.display = "flex";
-        taskNameInput.focus();
-      }
-
-      // Закрыть модальное окно
-      function closeModal() {
-        modalOverlay.style.display = "none";
-      }
-
-      // Рендер списка задач с фильтрацией
       function renderTasks() {
         list.innerHTML = "";
-        const filterStatus = statusFilter.value;
-        const filterPriority = priorityFilter.value;
-
-        const filteredKeys = Object.keys(tasks).filter((key) => {
-          const task = tasks[key];
-          if (filterStatus !== "Все" && task.status !== filterStatus) return false;
-          if (filterPriority !== "Все" && task.priority !== filterPriority) return false;
-          return true;
+        let filteredTasks = Object.entries(tasks).filter(([key, task]) => {
+          let statusMatch = statusFilter.value === "Все" || task.status === statusFilter.value;
+          let priorityMatch = priorityFilter.value === "Все" || task.priority === priorityFilter.value;
+          return statusMatch && priorityMatch;
         });
 
-        if (filteredKeys.length === 0) {
-          const emptyMsg = document.createElement("p");
-          emptyMsg.textContent = "Нет задач для отображения.";
-          emptyMsg.style.textAlign = "center";
-          emptyMsg.style.color = "#777";
-          list.appendChild(emptyMsg);
+        if (filteredTasks.length === 0) {
+          list.innerHTML = "<p>Нет задач для отображения.</p>";
           return;
         }
 
-        filteredKeys.forEach((key) => {
-          const task = tasks[key];
+        filteredTasks.forEach(([key, task]) => {
           const li = document.createElement("li");
 
-          // Название задачи (кликабельно для редактирования)
           const nameDiv = document.createElement("div");
           nameDiv.className = "task-name";
           nameDiv.textContent = task.name;
           nameDiv.title = "Кликните для редактирования";
-          nameDiv.onclick = () => openModalForEditTask(key);
-          li.appendChild(nameDiv);
+          nameDiv.onclick = () => openEditModal(key, task);
 
-          // Дата
           const dateDiv = document.createElement("div");
           dateDiv.className = "task-date";
-          dateDiv.textContent = `Срок: ${task.date}`;
-          li.appendChild(dateDiv);
+          dateDiv.textContent = task.date ? `Сделать до: ${task.date}` : "Дата не указана";
 
-          // Статус
-          const statusSpan = document.createElement("button");
-          statusSpan.className = `task-status status-${task.status.replace(/\s/g, "\\ ")}`;
-          statusSpan.textContent = task.status;
-          statusSpan.title = "Статус задачи";
-          li.appendChild(statusSpan);
+          // Статус с цветом
+          const statusBtn = document.createElement("button");
+          statusBtn.className = `task-status status-${task.status.replace(/\s/g, '\\ ')}`;
+          statusBtn.textContent = task.status;
 
-          // Приоритет
-          const prioritySpan = document.createElement("span");
-          prioritySpan.className = `task-priority priority-${task.priority.replace(/\s/g, "\\+")}`;
-          prioritySpan.textContent = task.priority;
-          li.appendChild(prioritySpan);
+          // Приоритет с цветом
+          const priorityBtn = document.createElement("div");
+          priorityBtn.className = `task-priority priority-${task.priority.replace(/\s/g, '\\ ')}`;
+          priorityBtn.textContent = task.priority;
 
-          // Кнопки редактирования и удаления
           const actionsDiv = document.createElement("div");
           actionsDiv.className = "task-actions";
 
           const editBtn = document.createElement("button");
+          editBtn.textContent = "✏️ Ред.";
           editBtn.className = "edit-btn";
-          editBtn.textContent = "✏️";
-          editBtn.title = "Редактировать задачу";
-          editBtn.onclick = () => openModalForEditTask(key);
-          actionsDiv.appendChild(editBtn);
+          editBtn.onclick = () => openEditModal(key, task);
 
           const deleteBtn = document.createElement("button");
+          deleteBtn.textContent = "🗑 Уд.";
           deleteBtn.className = "delete-btn";
-          deleteBtn.textContent = "🗑";
-          deleteBtn.title = "Удалить задачу";
-          deleteBtn.onclick = () => deleteTask(key);
-          actionsDiv.appendChild(deleteBtn);
+          deleteBtn.onclick = () => {
+            if (confirm(`Удалить задачу "${task.name}"?`)) {
+              remove(ref(db, `users/${userId}/tasks/${key}`));
+            }
+          };
 
-          li.appendChild(actionsDiv);
+          actionsDiv.append(editBtn, deleteBtn);
 
+          li.append(nameDiv, dateDiv, statusBtn, priorityBtn, actionsDiv);
           list.appendChild(li);
         });
       }
 
-      // Навешиваем обработчики
-      openModalBtn.onclick = openModalForNewTask;
-      saveBtn.onclick = saveTask;
-      cancelBtn.onclick = closeModal;
-      modalOverlay.onclick = (e) => {
-        if (e.target === modalOverlay) closeModal();
+      function openEditModal(key = null, task = null) {
+        editTaskKey = key;
+        modalTitle.textContent = key ? "Редактировать задачу" : "Создать задачу";
+
+        taskNameInput.value = task?.name || "";
+        taskStatusSelect.value = task?.status || "В очереди";
+        taskPrioritySelect.value = task?.priority || "Не важно + Не срочно";
+        taskDateInput.value = task?.date || "";
+
+        modalOverlay.style.display = "flex";
+      }
+
+      openModalBtn.onclick = () => openEditModal();
+
+      cancelBtn.onclick = () => {
+        modalOverlay.style.display = "none";
+        editTaskKey = null;
       };
+
+      saveBtn.onclick = () => {
+        const name = taskNameInput.value.trim();
+        const status = taskStatusSelect.value;
+        const priority = taskPrioritySelect.value;
+        const date = taskDateInput.value;
+
+        if (!name) {
+          alert("Название задачи не может быть пустым!");
+          return;
+        }
+
+        if (editTaskKey) {
+          // Редактирование
+          const taskRef = ref(db, `users/${userId}/tasks/${editTaskKey}`);
+          update(taskRef, { name, status, priority, date });
+        } else {
+          // Создание
+          const newTaskRef = push(ref(db, `users/${userId}/tasks`));
+          set(newTaskRef, { name, status, priority, date });
+        }
+        modalOverlay.style.display = "none";
+        editTaskKey = null;
+      };
+
+      // Фильтрация
       statusFilter.onchange = renderTasks;
       priorityFilter.onchange = renderTasks;
-
-      // Запускаем загрузку
-      loadTasks();
     };
   </script>
 </head>
 <body>
-  <div id="user-info"></div>
+  <div id="user-info">Загрузка пользователя...</div>
 
-  <div class="card">
-    <button id="add-task">Создать задачу</button>
+  <div id="filters-container" class="card">
+    <select id="status-filter" title="Фильтр по статусу">
+      <option>Все</option>
+      <option>В очереди</option>
+      <option>В работе</option>
+      <option>Выполнена</option>
+    </select>
 
-    <div id="filters-container">
-      <select id="status-filter" title="Фильтр по статусу">
-        <option>Все</option>
-        <option>В очереди</option>
-        <option>В работе</option>
-        <option>Выполнена</option>
-      </select>
-
-      <select id="priority-filter" title="Фильтр по приоритету">
-        <option>Все</option>
-        <option>Важно + Срочно</option>
-        <option>Важно + Не срочно</option>
-        <option>Не важно + Срочно</option>
-        <option>Не важно + Не срочно</option>
-      </select>
-    </div>
-
-    <ul id="task-list"></ul>
+    <select id="priority-filter" title="Фильтр по приоритету">
+      <option>Все</option>
+      <option>Важно + Срочно</option>
+      <option>Важно + Не срочно</option>
+      <option>Не важно + Срочно</option>
+      <option>Не важно + Не срочно</option>
+    </select>
   </div>
 
-  <!-- Модальное окно для создания и редактирования задачи -->
+  <div class="card">
+    <button id="add-task">➕ Добавить задачу</button>
+  </div>
+
+  <ul id="task-list"></ul>
+
   <div id="modal-overlay" class="modal-overlay">
-    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal">
       <h3 id="modal-title">Создать задачу</h3>
-
       <label for="task-name">Название задачи</label>
-      <input id="task-name" type="text" placeholder="Что нужно сделать?" autocomplete="off" />
-
-      <label for="task-date">Дата выполнения</label>
-      <input id="task-date" type="date" />
-
-      <label for="task-status">Статус задачи</label>
+      <input id="task-name" type="text" placeholder="Что сделать?" />
+      
+      <label for="task-status">Статус</label>
       <select id="task-status">
         <option>В очереди</option>
         <option>В работе</option>
@@ -503,9 +444,12 @@
         <option>Не важно + Не срочно</option>
       </select>
 
+      <label for="task-date">Дата выполнения</label>
+      <input id="task-date" type="date" />
+
       <div class="modal-buttons">
-        <button id="cancel-task" class="btn-cancel">Отмена</button>
-        <button id="save-task" class="btn-save">Сохранить</button>
+        <button class="btn-cancel" id="cancel-task">Отмена</button>
+        <button class="btn-save" id="save-task">Сохранить</button>
       </div>
     </div>
   </div>
