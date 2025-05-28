@@ -214,7 +214,7 @@
     .btn-save:hover {
       background-color: #45a049;
     }
-    #status-filter, #priority-filter {
+    #status-filter, #priority-filter, #sort-field, #sort-direction {
       margin-top: 15px;
       background: #333;
       color: #eee;
@@ -242,7 +242,6 @@
       getDatabase, ref, set, push, onValue, update, remove
     } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-database.js";
 
-    // Твой конфиг Firebase
     const firebaseConfig = {
       apiKey: "AIzaSyA_E4t3RHWLNtorKm9utOyyRwojkUsUmis",
       authDomain: "telegramminiappdaily.firebaseapp.com",
@@ -268,138 +267,198 @@
       const list = document.getElementById("task-list");
       const statusFilter = document.getElementById("status-filter");
       const priorityFilter = document.getElementById("priority-filter");
-      const openModalBtn = document.getElementById("add-task");
-      const modalOverlay = document.getElementById("modal-overlay");
-      const modalTitle = document.getElementById("modal-title");
-      const taskNameInput = document.getElementById("task-name");
-      const taskStatusSelect = document.getElementById("task-status");
-      const taskPrioritySelect = document.getElementById("task-priority");
-      const taskDateInput = document.getElementById("task-date");
-      const saveBtn = document.getElementById("save-task");
-      const cancelBtn = document.getElementById("cancel-task");
+      const sortFieldSelect = document.getElementById("sort-field");
+      const sortDirectionSelect = document.getElementById("sort-direction");
 
       let tasks = {};
-      let editTaskKey = null;
+      let currentEditId = null;
 
-      // Загрузка задач
-      const tasksRef = ref(db, 'users/' + userId + '/tasks');
+      // Загрузка данных
+      const tasksRef = ref(db, "tasks/" + userId);
       onValue(tasksRef, (snapshot) => {
         tasks = snapshot.val() || {};
         renderTasks();
       });
 
+      // Функция сортировки и фильтрации
       function renderTasks() {
         list.innerHTML = "";
-        let filteredTasks = Object.entries(tasks).filter(([key, task]) => {
-          let statusMatch = statusFilter.value === "Все" || task.status === statusFilter.value;
-          let priorityMatch = priorityFilter.value === "Все" || task.priority === priorityFilter.value;
-          return statusMatch && priorityMatch;
+
+        let filteredTasks = Object.entries(tasks).filter(([id, task]) => {
+          if (statusFilter.value !== "Все" && task.status !== statusFilter.value) return false;
+          if (priorityFilter.value !== "Все" && task.priority !== priorityFilter.value) return false;
+          return true;
+        });
+
+        // Сортировка
+        const field = sortFieldSelect.value;
+        const direction = sortDirectionSelect.value;
+
+        filteredTasks.sort((a, b) => {
+          const taskA = a[1];
+          const taskB = b[1];
+
+          let valA, valB;
+
+          switch (field) {
+            case "date":
+              valA = taskA.date || "";
+              valB = taskB.date || "";
+              break;
+            case "status":
+              // Чтобы статусы сортировались логично — сделаем порядок вручную:
+              const orderStatus = { "В очереди": 1, "В работе": 2, "Выполнена": 3 };
+              valA = orderStatus[taskA.status] || 99;
+              valB = orderStatus[taskB.status] || 99;
+              break;
+            case "priority":
+              // Порядок приоритетов:
+              const orderPriority = {
+                "Важно + Срочно": 1,
+                "Важно + Не срочно": 2,
+                "Не важно + Срочно": 3,
+                "Не важно + Не срочно": 4,
+              };
+              valA = orderPriority[taskA.priority] || 99;
+              valB = orderPriority[taskB.priority] || 99;
+              break;
+            case "name":
+              valA = taskA.name.toLowerCase();
+              valB = taskB.name.toLowerCase();
+              break;
+            default:
+              valA = taskA.name.toLowerCase();
+              valB = taskB.name.toLowerCase();
+          }
+
+          if (valA < valB) return direction === "asc" ? -1 : 1;
+          if (valA > valB) return direction === "asc" ? 1 : -1;
+          return 0;
         });
 
         if (filteredTasks.length === 0) {
-          list.innerHTML = "<p>Нет задач для отображения.</p>";
+          list.innerHTML = "<li>Нет задач, подходящих под фильтр.</li>";
           return;
         }
 
-        filteredTasks.forEach(([key, task]) => {
+        for (const [id, task] of filteredTasks) {
           const li = document.createElement("li");
 
-          const nameDiv = document.createElement("div");
-          nameDiv.className = "task-name";
-          nameDiv.textContent = task.name;
-          nameDiv.title = "Кликните для редактирования";
-          nameDiv.onclick = () => openEditModal(key, task);
+          const nameEl = document.createElement("div");
+          nameEl.className = "task-name";
+          nameEl.textContent = task.name;
+          li.appendChild(nameEl);
 
-          const dateDiv = document.createElement("div");
-          dateDiv.className = "task-date";
-          dateDiv.textContent = task.date ? `Сделать до: ${task.date}` : "Дата не указана";
+          const dateEl = document.createElement("div");
+          dateEl.className = "task-date";
+          dateEl.textContent = task.date ? new Date(task.date).toLocaleDateString("ru-RU") : "Без даты";
+          li.appendChild(dateEl);
 
-          // Статус с цветом
-          const statusBtn = document.createElement("button");
-          statusBtn.className = `task-status status-${task.status.replace(/\s/g, '\\ ')}`;
-          statusBtn.textContent = task.status;
+          const statusEl = document.createElement("button");
+          statusEl.className = "task-status status-" + task.status.replace(/\s/g, "\\ ");
+          statusEl.textContent = task.status;
+          li.appendChild(statusEl);
 
-          // Приоритет с цветом
-          const priorityBtn = document.createElement("div");
-          priorityBtn.className = `task-priority priority-${task.priority.replace(/\s/g, '\\ ')}`;
-          priorityBtn.textContent = task.priority;
+          const priorityEl = document.createElement("div");
+          priorityEl.className = "task-priority priority-" + task.priority.replace(/\s/g, "\\ ");
+          priorityEl.textContent = task.priority;
+          li.appendChild(priorityEl);
 
           const actionsDiv = document.createElement("div");
           actionsDiv.className = "task-actions";
 
           const editBtn = document.createElement("button");
-          editBtn.textContent = "✏️ Ред.";
           editBtn.className = "edit-btn";
-          editBtn.onclick = () => openEditModal(key, task);
+          editBtn.textContent = "✏️";
+          editBtn.title = "Редактировать задачу";
+          editBtn.onclick = () => openModal(id, task);
+          actionsDiv.appendChild(editBtn);
 
-          const deleteBtn = document.createElement("button");
-          deleteBtn.textContent = "🗑 Уд.";
-          deleteBtn.className = "delete-btn";
-          deleteBtn.onclick = () => {
-            if (confirm(`Удалить задачу "${task.name}"?`)) {
-              remove(ref(db, `users/${userId}/tasks/${key}`));
+          const delBtn = document.createElement("button");
+          delBtn.className = "delete-btn";
+          delBtn.textContent = "🗑";
+          delBtn.title = "Удалить задачу";
+          delBtn.onclick = () => {
+            if (confirm("Удалить задачу?")) {
+              remove(ref(db, `tasks/${userId}/${id}`));
             }
           };
+          actionsDiv.appendChild(delBtn);
 
-          actionsDiv.append(editBtn, deleteBtn);
+          li.appendChild(actionsDiv);
 
-          li.append(nameDiv, dateDiv, statusBtn, priorityBtn, actionsDiv);
           list.appendChild(li);
-        });
+        }
       }
 
-      function openEditModal(key = null, task = null) {
-        editTaskKey = key;
-        modalTitle.textContent = key ? "Редактировать задачу" : "Создать задачу";
-
-        taskNameInput.value = task?.name || "";
-        taskStatusSelect.value = task?.status || "В очереди";
-        taskPrioritySelect.value = task?.priority || "Не важно + Не срочно";
-        taskDateInput.value = task?.date || "";
-
-        modalOverlay.style.display = "flex";
-      }
-
-      openModalBtn.onclick = () => openEditModal();
-
-      cancelBtn.onclick = () => {
-        modalOverlay.style.display = "none";
-        editTaskKey = null;
-      };
-
-      saveBtn.onclick = () => {
-        const name = taskNameInput.value.trim();
-        const status = taskStatusSelect.value;
-        const priority = taskPrioritySelect.value;
-        const date = taskDateInput.value;
-
-        if (!name) {
-          alert("Название задачи не может быть пустым!");
-          return;
-        }
-
-        if (editTaskKey) {
-          // Редактирование
-          const taskRef = ref(db, `users/${userId}/tasks/${editTaskKey}`);
-          update(taskRef, { name, status, priority, date });
-        } else {
-          // Создание
-          const newTaskRef = push(ref(db, `users/${userId}/tasks`));
-          set(newTaskRef, { name, status, priority, date });
-        }
-        modalOverlay.style.display = "none";
-        editTaskKey = null;
-      };
-
-      // Фильтрация
+      // Фильтры и сортировка — при изменении обновляем список
       statusFilter.onchange = renderTasks;
       priorityFilter.onchange = renderTasks;
+      sortFieldSelect.onchange = renderTasks;
+      sortDirectionSelect.onchange = renderTasks;
+
+      // Модальное окно
+      const modal = document.getElementById("modal");
+      const inputName = document.getElementById("task-name");
+      const inputDate = document.getElementById("task-date");
+      const selectStatus = document.getElementById("task-status");
+      const selectPriority = document.getElementById("task-priority");
+
+      function openModal(id = null, task = null) {
+        currentEditId = id;
+        if (task) {
+          inputName.value = task.name;
+          inputDate.value = task.date || "";
+          selectStatus.value = task.status;
+          selectPriority.value = task.priority;
+        } else {
+          inputName.value = "";
+          inputDate.value = "";
+          selectStatus.value = "В очереди";
+          selectPriority.value = "Не важно + Не срочно";
+        }
+        modal.style.display = "flex";
+      }
+
+      document.getElementById("btn-new-task").onclick = () => openModal();
+
+      document.getElementById("btn-cancel").onclick = () => {
+        modal.style.display = "none";
+        currentEditId = null;
+      };
+
+      document.getElementById("btn-save").onclick = () => {
+        const name = inputName.value.trim();
+        if (!name) {
+          alert("Введите название задачи.");
+          return;
+        }
+        const date = inputDate.value;
+        const status = selectStatus.value;
+        const priority = selectPriority.value;
+
+        if (currentEditId) {
+          update(ref(db, `tasks/${userId}/${currentEditId}`), { name, date, status, priority });
+        } else {
+          const newTaskRef = push(ref(db, `tasks/${userId}`));
+          set(newTaskRef, { name, date, status, priority });
+        }
+        modal.style.display = "none";
+        currentEditId = null;
+      };
+
+      // Закрытие модального по клику вне окна
+      modal.onclick = (e) => {
+        if (e.target === modal) {
+          modal.style.display = "none";
+          currentEditId = null;
+        }
+      };
     };
   </script>
 </head>
 <body>
-  <div id="user-info">Загрузка пользователя...</div>
-
+  <div id="user-info"></div>
   <div id="filters-container" class="card">
     <select id="status-filter" title="Фильтр по статусу">
       <option>Все</option>
@@ -407,7 +466,6 @@
       <option>В работе</option>
       <option>Выполнена</option>
     </select>
-
     <select id="priority-filter" title="Фильтр по приоритету">
       <option>Все</option>
       <option>Важно + Срочно</option>
@@ -415,20 +473,30 @@
       <option>Не важно + Срочно</option>
       <option>Не важно + Не срочно</option>
     </select>
+    <select id="sort-field" title="Сортировать по">
+      <option value="date">Дате</option>
+      <option value="status">Статусу</option>
+      <option value="priority">Приоритету</option>
+      <option value="name" selected>Названию</option>
+    </select>
+    <select id="sort-direction" title="Направление сортировки">
+      <option value="asc" selected>По возрастанию</option>
+      <option value="desc">По убыванию</option>
+    </select>
   </div>
+  <button id="btn-new-task" class="card">➕ Создать задачу</button>
+  <ul id="task-list" class="card"></ul>
 
-  <div class="card">
-    <button id="add-task">➕ Добавить задачу</button>
-  </div>
-
-  <ul id="task-list"></ul>
-
-  <div id="modal-overlay" class="modal-overlay">
+  <!-- Модальное окно -->
+  <div id="modal" class="modal-overlay">
     <div class="modal">
-      <h3 id="modal-title">Создать задачу</h3>
+      <h3>Создать / Редактировать задачу</h3>
       <label for="task-name">Название задачи</label>
-      <input id="task-name" type="text" placeholder="Что сделать?" />
-      
+      <input type="text" id="task-name" placeholder="Введите задачу" />
+
+      <label for="task-date">Дата выполнения</label>
+      <input type="date" id="task-date" />
+
       <label for="task-status">Статус</label>
       <select id="task-status">
         <option>В очереди</option>
@@ -444,12 +512,9 @@
         <option>Не важно + Не срочно</option>
       </select>
 
-      <label for="task-date">Дата выполнения</label>
-      <input id="task-date" type="date" />
-
       <div class="modal-buttons">
-        <button class="btn-cancel" id="cancel-task">Отмена</button>
-        <button class="btn-save" id="save-task">Сохранить</button>
+        <button id="btn-cancel" class="btn-cancel">Отмена</button>
+        <button id="btn-save" class="btn-save">Сохранить</button>
       </div>
     </div>
   </div>
